@@ -278,7 +278,7 @@ pub mod defi {
         require!(amount > 0, ErrorCode::InvalidAmount);
         let token_kind = TokenKind::from_u8(token_type)?;
 
-        // FIX: Enforce minimum stake amount to prevent dust attacks
+        // Enforce minimum stake amount to prevent dust attacks
         if amount < state.min_stake_amount {
             msg!(
                 "Stake amount {} below minimum required {}",
@@ -295,7 +295,7 @@ pub mod defi {
         if user_stake.staked_amount == 0 {
             user_stake.user = ctx.accounts.user.key();
             user_stake.token_type = token_kind.as_u8();
-            // This is crucial: sets their "starting point" to the current global value
+            // Sets their "starting point" to the current global value
             user_stake.reward_per_token_paid = state.reward_per_token_stored;
         } else {
             require!(
@@ -1089,7 +1089,7 @@ pub mod defi {
 
         let total_supply = ctx.accounts.lp_token_mint.supply;
         let lp_to_mint = if total_supply == 0 {
-            // FIX: Use proper geometric mean calculation for initial LP tokens
+            // Use proper geometric mean calculation for initial LP tokens
             // This prevents manipulation where first LP gets disproportionate share
             // Following Uniswap V2 standard: sqrt(amount_a * amount_b) - MINIMUM_LIQUIDITY
             let product = (amount_a as u128)
@@ -1195,7 +1195,7 @@ pub mod defi {
 
         let total_supply = ctx.accounts.lp_token_mint.supply;
 
-        // FIX: Improved precision for liquidity calculations
+        // Improved precision for liquidity calculations
         // Use checked math to prevent precision loss and ensure fair withdrawals
         let amount_a = ((lp_amount as u128)
             .checked_mul(ctx.accounts.pool_token_a.amount as u128)
@@ -1285,7 +1285,7 @@ pub mod defi {
         ctx: Context<EmergencyRemoveLiquidity>,
         lp_amount: u64,
     ) -> Result<()> {
-        // FIX: Emergency withdraw should ONLY work when protocol is paused
+        // Emergency withdraw should ONLY work when protocol is paused
         // This prevents abuse to bypass minimum liquidity checks during normal operations
         require!(ctx.accounts.state.paused, ErrorCode::NotInEmergencyMode);
         require!(lp_amount > 0, ErrorCode::InvalidAmount);
@@ -1408,7 +1408,7 @@ pub mod defi {
         );
         msg!("Pool PDA: {}", ctx.accounts.pool.key());
 
-        // FIX: Add maximum swap amount check to prevent pool manipulation
+        // Add maximum swap amount check to prevent pool manipulation
         // Limit swaps to 10% of pool reserves to maintain price stability
         let max_swap_a = ctx.accounts.pool_token_a.amount / 10;
         let max_swap_b = ctx.accounts.pool_token_b.amount / 10;
@@ -1426,7 +1426,6 @@ pub mod defi {
                 &mut ctx.accounts.pool_token_b,
             );
 
-            // FIX: Remove protocol fee calculation to avoid treasury PDA mismatch
             // All swap fees stay in the pool for LP providers (standard AMM model)
             let fee = amount_in
                 .checked_mul(ctx.accounts.pool.fee_basis_points as u64)
@@ -1496,7 +1495,6 @@ pub mod defi {
                 &mut ctx.accounts.pool_token_a,
             );
 
-            // FIX: Remove protocol fee calculation to avoid treasury PDA mismatch
             // All swap fees stay in the pool for LP providers (standard AMM model)
             let fee = amount_in
                 .checked_mul(ctx.accounts.pool.fee_basis_points as u64)
