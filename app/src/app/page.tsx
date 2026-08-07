@@ -294,6 +294,24 @@ function Dashboard() {
   const [tab, setTab] = useState<TabId>("stake");
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Auto-detect admin access from on-chain authority + signers
+  useEffect(() => {
+    if (!provider || !walletPk) return;
+    (async () => {
+      try {
+        const [statePda] = getStatePda();
+        const info = await provider.connection.getAccountInfo(statePda);
+        if (info && info.data.length >= 136) {
+          const authority = new PublicKey(info.data.slice(40, 72));   // offset 8+32=40
+          const s1 = new PublicKey(info.data.slice(72, 104));
+          const s2 = new PublicKey(info.data.slice(104, 136));
+          const pk = walletPk;
+          setIsAdmin(pk.equals(authority) || pk.equals(s1) || pk.equals(s2));
+        }
+      } catch { setIsAdmin(false); }
+    })();
+  }, [provider, walletPk]);
+
   const tabs: { id: TabId; label: string; icon: string; adminOnly?: boolean }[] = [
     { id: "stake", label: "Stake", icon: "📥" },
     { id: "unstake", label: "Unstake", icon: "📤" },
@@ -303,7 +321,7 @@ function Dashboard() {
     { id: "liquidity", label: "Liquidity", icon: "💧" },
     { id: "admin", label: "Admin", icon: "⚙️", adminOnly: true },
   ];
-  const visible = tabs.filter((t) => !t.adminOnly || (isAdmin && t.adminOnly));
+  const visible = tabs.filter((t) => !t.adminOnly || isAdmin);
   const base58 = walletPk?.toBase58() ?? "";
 
   return (
@@ -320,13 +338,6 @@ function Dashboard() {
             </span>
           </p>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
-          <span className="text-xs text-slate-500">Admin Mode</span>
-          <button onClick={() => setIsAdmin(!isAdmin)}
-            className={`relative w-11 h-6 rounded-full transition-colors ${isAdmin ? "bg-amber-500" : "bg-slate-700"}`}>
-            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isAdmin ? "translate-x-5" : ""}`} />
-          </button>
-        </label>
       </div>
       <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {visible.map((t) => (
@@ -414,12 +425,14 @@ function InpTxt({ label, val, set, ph }: { label: string; val: string; set: (v: 
 /* ─── STAKE ──────────────────────────────────────────── */
 function StakePanel({ program, provider }: { program: any; provider: any }) {
   return (
-    <div className="space-y-4 sm:space-y-5">
-      <div>
-        <h3 className="text-base sm:text-lg font-semibold text-sky-300">Stake Tokens</h3>
-        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Deposit SOL or USDC to earn rewards. Each pool operates independently.</p>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Stake</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Earn yield by depositing SOL or USDC</p>
+        </div>
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <SolStakeCard program={program} provider={provider} />
         <UsdcStakeCard program={program} provider={provider} />
       </div>
@@ -433,22 +446,31 @@ function SolStakeCard({ program, provider }: { program: any; provider: any }) {
   const [s, setS] = useState<TxStatus>("idle");
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  const [userStaked, setUserStaked] = useState<string | null>(null);
   const [poolBal, setPoolBal] = useState<string | null>(null);
   const tt = 0 as TokenType;
 
   useEffect(() => {
-    if (!provider) return;
+    if (!provider || !pk) return;
     (async () => {
       try {
+        const [usp] = getUserStakePda(pk, tt);
         const [stp] = getStakingPoolPda(tt);
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const raw = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(raw) / 1e9).toFixed(4)} SOL`);
-        } else { setPoolBal("0 SOL"); }
-      } catch { setPoolBal(null); }
+        const [uInfo, pInfo] = await Promise.all([
+          provider.connection.getAccountInfo(usp),
+          provider.connection.getAccountInfo(stp),
+        ]);
+        if (uInfo && uInfo.data.length >= 80) {
+          const dv = new DataView(uInfo.data.buffer, uInfo.data.byteOffset + 8, uInfo.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e9).toFixed(4));
+        } else { setUserStaked("0"); }
+        if (pInfo && pInfo.data.length >= 72) {
+          const raw = new DataView(pInfo.data.buffer, pInfo.data.byteOffset + 64, 8).getBigUint64(0, true);
+          setPoolBal((Number(raw) / 1e9).toFixed(4));
+        } else { setPoolBal("0"); }
+      } catch { setUserStaked(null); setPoolBal(null); }
     })();
-  }, [provider]);
+  }, [provider, pk]);
 
   const run = useCallback(async () => {
     if (!program || !provider || !pk) return;
@@ -492,29 +514,41 @@ function SolStakeCard({ program, provider }: { program: any; provider: any }) {
         state: sp, userStake: usp, tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
-      setS("confirmed"); setOk(`Staked ${amt} SOL! TX: ${tx.slice(0, 12)}...`); setAmt("");
+      setS("confirmed"); setOk(`Staked ${amt} SOL`); setAmt("");
+      // Refresh user stake
       try {
-        const info = await conn.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const bal = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(bal) / 1e9).toFixed(4)} SOL`);
+        const info = await conn.getAccountInfo(usp);
+        if (info && info.data.length >= 80) {
+          const dv = new DataView(info.data.buffer, info.data.byteOffset + 8, info.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e9).toFixed(4));
         }
       } catch {}
     } catch (e) { setS("error"); setErr(parseErrorMessage(e)); }
   }, [program, provider, pk, amt]);
 
   return (
-    <div className="glass rounded-xl p-4 border-sky-500/10 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">☀️</span>
-        <h4 className="text-sm font-semibold text-sky-300">Stake SOL</h4>
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" strokeWidth="1.5" /></svg>
+        </div>
+        <div>
+          <h4 className="text-sm font-medium text-white">SOL Staking</h4>
+          <p className="text-[11px] text-slate-500">Auto-wraps to WSOL · Min 1 SOL</p>
+        </div>
       </div>
-      <p className="text-xs text-slate-500">SOL auto-wraps to WSOL. Minimum: 1 SOL.</p>
-      <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs font-mono">
-        Pool: {poolBal ?? "..."}
+      <div className="mb-4 space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-slate-500">Your stake</span>
+          <span className="text-slate-300 font-mono">{userStaked !== null ? `${userStaked} SOL` : "—"}</span>
+        </div>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-slate-600">Pool total</span>
+          <span className="text-slate-500 font-mono">{poolBal !== null ? `${poolBal} SOL` : "—"}</span>
+        </div>
       </div>
-      <Inp label="Amount (SOL)" val={amt} set={setAmt} ph="1.0" />
-      <ABtn label="Stake SOL" onClick={run} status={s} disabled={!amt} />
+      <Inp label="Amount" val={amt} set={setAmt} ph="1.0" />
+      <div className="mt-3"><ABtn label="Stake SOL" onClick={run} status={s} disabled={!amt} /></div>
       <Err message={err} /><Ok message={ok} />
     </div>
   );
@@ -526,22 +560,22 @@ function UsdcStakeCard({ program, provider }: { program: any; provider: any }) {
   const [s, setS] = useState<TxStatus>("idle");
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-  const [poolBal, setPoolBal] = useState<string | null>(null);
+  const [userStaked, setUserStaked] = useState<string | null>(null);
   const tt = 1 as TokenType;
 
   useEffect(() => {
-    if (!provider) return;
+    if (!provider || !pk) return;
     (async () => {
       try {
-        const [stp] = getStakingPoolPda(tt);
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const raw = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(raw) / 1e6).toFixed(2)} USDC`);
-        } else { setPoolBal("0 USDC"); }
-      } catch { setPoolBal(null); }
+        const [usp] = getUserStakePda(pk, tt);
+        const info = await provider.connection.getAccountInfo(usp);
+        if (info && info.data.length >= 80) {
+          const dv = new DataView(info.data.buffer, info.data.byteOffset + 8, info.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e6).toFixed(2));
+        } else { setUserStaked("0"); }
+      } catch { setUserStaked(null); }
     })();
-  }, [provider]);
+  }, [provider, pk]);
 
   const run = useCallback(async () => {
     if (!program || !provider || !pk) return;
@@ -561,29 +595,35 @@ function UsdcStakeCard({ program, provider }: { program: any; provider: any }) {
         state: sp, userStake: usp, tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       }).rpc();
-      setS("confirmed"); setOk(`Staked ${amt} USDC! TX: ${tx.slice(0, 12)}...`); setAmt("");
+      setS("confirmed"); setOk(`Staked ${amt} USDC`); setAmt("");
+      // Refresh user stake
       try {
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const bal = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(bal) / 1e6).toFixed(2)} USDC`);
+        const info = await provider.connection.getAccountInfo(usp);
+        if (info && info.data.length >= 80) {
+          const dv = new DataView(info.data.buffer, info.data.byteOffset + 8, info.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e6).toFixed(2));
         }
       } catch {}
     } catch (e) { setS("error"); setErr(parseErrorMessage(e)); }
   }, [program, provider, pk, amt]);
 
   return (
-    <div className="glass rounded-xl p-4 border-sky-500/10 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className="text-lg">💵</span>
-        <h4 className="text-sm font-semibold text-sky-300">Stake USDC</h4>
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center">
+          <span className="text-xs font-bold text-white">$</span>
+        </div>
+        <div>
+          <h4 className="text-sm font-medium text-white">USDC Staking</h4>
+          <p className="text-[11px] text-slate-500">Min 1,000 USDC · Contract-enforced</p>
+        </div>
       </div>
-      <p className="text-xs text-slate-500">Requires USDC tokens in your wallet. Minimum: 1,000 USDC.</p>
-      <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs font-mono">
-        Pool: {poolBal ?? "..."}
+      <div className="mb-4 flex items-center justify-between text-xs">
+        <span className="text-slate-500">Your stake</span>
+        <span className="text-slate-300 font-mono">{userStaked !== null ? `${userStaked} USDC` : "—"}</span>
       </div>
-      <Inp label="Amount (USDC)" val={amt} set={setAmt} ph="1000" />
-      <ABtn label="Stake USDC" onClick={run} status={s} disabled={!amt} />
+      <Inp label="Amount" val={amt} set={setAmt} ph="1000" />
+      <div className="mt-3"><ABtn label="Stake USDC" onClick={run} status={s} disabled={!amt} /></div>
       <Err message={err} /><Ok message={ok} />
     </div>
   );
@@ -612,21 +652,30 @@ function SolUnstakeCard({ program, provider }: { program: any; provider: any }) 
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [poolBal, setPoolBal] = useState<string | null>(null);
+  const [userStaked, setUserStaked] = useState<string | null>(null);
   const tt = 0 as TokenType;
 
   useEffect(() => {
-    if (!provider) return;
+    if (!provider || !pk) return;
     (async () => {
       try {
         const [stp] = getStakingPoolPda(tt);
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const raw = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(raw) / 1e9).toFixed(4)} SOL`);
-        } else { setPoolBal("0 SOL"); }
-      } catch { setPoolBal(null); }
+        const [usp] = getUserStakePda(pk, tt);
+        const [pInfo, uInfo] = await Promise.all([
+          provider.connection.getAccountInfo(stp),
+          provider.connection.getAccountInfo(usp),
+        ]);
+        if (pInfo && pInfo.data.length >= 72) {
+          const raw = new DataView(pInfo.data.buffer, pInfo.data.byteOffset + 64, 8).getBigUint64(0, true);
+          setPoolBal((Number(raw) / 1e9).toFixed(4));
+        } else { setPoolBal("0"); }
+        if (uInfo && uInfo.data.length >= 80) {
+          const dv = new DataView(uInfo.data.buffer, uInfo.data.byteOffset + 8, uInfo.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e9).toFixed(4));
+        } else { setUserStaked("0"); }
+      } catch { setPoolBal(null); setUserStaked(null); }
     })();
-  }, [provider]);
+  }, [provider, pk]);
 
   const run = useCallback(async () => {
     if (!program || !provider || !pk) return;
@@ -645,10 +694,17 @@ function SolUnstakeCard({ program, provider }: { program: any; provider: any }) 
       }).rpc();
       setS("confirmed"); setOk(`Unstaked ${amt} SOL! TX: ${tx.slice(0, 12)}...`); setAmt("");
       try {
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const bal = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(bal) / 1e9).toFixed(4)} SOL`);
+        const [pInfo, uInfo] = await Promise.all([
+          provider.connection.getAccountInfo(stp),
+          provider.connection.getAccountInfo(usp),
+        ]);
+        if (pInfo && pInfo.data.length >= 72) {
+          const bal = new DataView(pInfo.data.buffer, pInfo.data.byteOffset + 64, 8).getBigUint64(0, true);
+          setPoolBal((Number(bal) / 1e9).toFixed(4));
+        }
+        if (uInfo && uInfo.data.length >= 80) {
+          const dv = new DataView(uInfo.data.buffer, uInfo.data.byteOffset + 8, uInfo.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e9).toFixed(4));
         }
       } catch {}
     } catch (e) { setS("error"); setErr(parseErrorMessage(e)); }
@@ -661,8 +717,9 @@ function SolUnstakeCard({ program, provider }: { program: any; provider: any }) 
         <h4 className="text-sm font-semibold text-sky-300">Unstake SOL</h4>
       </div>
       <p className="text-xs text-slate-500">Withdraw SOL back to WSOL (unwrap manually if needed).</p>
-      <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs font-mono">
-        Pool: {poolBal ?? "..."}
+      <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs space-y-1">
+        <div className="flex justify-between"><span>Your stake</span><span className="font-mono">{userStaked !== null ? `${userStaked} SOL` : "—"}</span></div>
+        <div className="flex justify-between text-sky-500/70"><span>Available</span><span className="font-mono">{poolBal !== null ? `${poolBal} SOL` : "—"}</span></div>
       </div>
       <Inp label="Amount (SOL)" val={amt} set={setAmt} ph="0.0" />
       <ABtn label="Unstake SOL" onClick={run} status={s} disabled={!amt} />
@@ -699,21 +756,30 @@ function UsdcUnstakeCard({ program, provider }: { program: any; provider: any })
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [poolBal, setPoolBal] = useState<string | null>(null);
+  const [userStaked, setUserStaked] = useState<string | null>(null);
   const tt = 1 as TokenType;
 
   useEffect(() => {
-    if (!provider) return;
+    if (!provider || !pk) return;
     (async () => {
       try {
         const [stp] = getStakingPoolPda(tt);
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const raw = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(raw) / 1e6).toFixed(2)} USDC`);
-        } else { setPoolBal("0 USDC"); }
-      } catch { setPoolBal(null); }
+        const [usp] = getUserStakePda(pk, tt);
+        const [pInfo, uInfo] = await Promise.all([
+          provider.connection.getAccountInfo(stp),
+          provider.connection.getAccountInfo(usp),
+        ]);
+        if (pInfo && pInfo.data.length >= 72) {
+          const raw = new DataView(pInfo.data.buffer, pInfo.data.byteOffset + 64, 8).getBigUint64(0, true);
+          setPoolBal((Number(raw) / 1e6).toFixed(2));
+        } else { setPoolBal("0"); }
+        if (uInfo && uInfo.data.length >= 80) {
+          const dv = new DataView(uInfo.data.buffer, uInfo.data.byteOffset + 8, uInfo.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e6).toFixed(2));
+        } else { setUserStaked("0"); }
+      } catch { setPoolBal(null); setUserStaked(null); }
     })();
-  }, [provider]);
+  }, [provider, pk]);
 
   const run = useCallback(async () => {
     if (!program || !provider || !pk) return;
@@ -732,10 +798,17 @@ function UsdcUnstakeCard({ program, provider }: { program: any; provider: any })
       }).rpc();
       setS("confirmed"); setOk(`Unstaked ${amt} USDC! TX: ${tx.slice(0, 12)}...`); setAmt("");
       try {
-        const info = await provider.connection.getAccountInfo(stp);
-        if (info && info.data.length >= 72) {
-          const bal = new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true);
-          setPoolBal(`${(Number(bal) / 1e6).toFixed(2)} USDC`);
+        const [pInfo, uInfo] = await Promise.all([
+          provider.connection.getAccountInfo(stp),
+          provider.connection.getAccountInfo(usp),
+        ]);
+        if (pInfo && pInfo.data.length >= 72) {
+          const bal = new DataView(pInfo.data.buffer, pInfo.data.byteOffset + 64, 8).getBigUint64(0, true);
+          setPoolBal((Number(bal) / 1e6).toFixed(2));
+        }
+        if (uInfo && uInfo.data.length >= 80) {
+          const dv = new DataView(uInfo.data.buffer, uInfo.data.byteOffset + 8, uInfo.data.length - 8);
+          setUserStaked((Number(dv.getBigUint64(32, true)) / 1e6).toFixed(2));
         }
       } catch {}
     } catch (e) { setS("error"); setErr(parseErrorMessage(e)); }
@@ -748,8 +821,9 @@ function UsdcUnstakeCard({ program, provider }: { program: any; provider: any })
         <h4 className="text-sm font-semibold text-sky-300">Unstake USDC</h4>
       </div>
       <p className="text-xs text-slate-500">Withdraw USDC tokens back to your wallet.</p>
-      <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs font-mono">
-        Pool: {poolBal ?? "..."}
+      <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs space-y-1">
+        <div className="flex justify-between"><span>Your stake</span><span className="font-mono">{userStaked !== null ? `${userStaked} USDC` : "—"}</span></div>
+        <div className="flex justify-between text-sky-500/70"><span>Available</span><span className="font-mono">{poolBal !== null ? `${poolBal} USDC` : "—"}</span></div>
       </div>
       <Inp label="Amount (USDC)" val={amt} set={setAmt} ph="0.0" />
       <ABtn label="Unstake USDC" onClick={run} status={s} disabled={!amt} />
@@ -1959,12 +2033,15 @@ function AdminPanel({ program, provider }: { program: any; provider: any }) {
 
       {/* ─── SECTION: Initialize State ─── */}
       <div className="glass rounded-xl p-4 border-amber-500/10">
-        <h4 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
-          1. Initialize Program State
-          {sec.state.init && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-normal">✓ Initialized</span>}
-          {!sec.state.init && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-normal">Pending</span>}
-        </h4>
-        <p className="text-xs text-slate-500 mb-3">One-time setup. Sets the authority, 3 multi-sig signers, and timelock delay.</p>
+        <h4 className="text-sm font-semibold text-amber-300 mb-1">1. Initialize Program State</h4>
+        <div className="flex items-center gap-2 mb-1">
+          {sec.state.init ? (
+            <span className="text-[11px] text-emerald-400">✓ Initialized</span>
+          ) : (
+            <span className="text-[11px] text-slate-500">Pending</span>
+          )}
+        </div>
+        <p className="text-xs text-slate-500 mb-3">One-time setup. <strong>Signers are immutable</strong> — once set, they cannot be changed. This prevents privilege escalation attacks.</p>
         {signerTrunc && currentSignerIndex > 0 && (
           <div className="mb-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
             ✓ You are <strong>Signer {currentSignerIndex}</strong> — authorized for governance actions
@@ -1993,11 +2070,14 @@ function AdminPanel({ program, provider }: { program: any; provider: any }) {
 
       {/* ─── SECTION: Initialize SOL Accounts ─── */}
       <div className="glass rounded-xl p-4 border-amber-500/10">
-        <h4 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
-          2. Initialize SOL Accounts
-          {sec.sol.init && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-normal">✓ Initialized</span>}
-          {!sec.sol.init && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-normal">Pending</span>}
-        </h4>
+        <h4 className="text-sm font-semibold text-amber-300 mb-1">2. Initialize SOL Accounts</h4>
+        <div className="flex items-center gap-2 mb-1">
+          {sec.sol.init ? (
+            <span className="text-[11px] text-emerald-400">✓ Initialized</span>
+          ) : (
+            <span className="text-[11px] text-slate-500">Pending</span>
+          )}
+        </div>
         <p className="text-xs text-slate-500 mb-3">Creates staking pool, reward vault, and treasury for SOL.</p>
         <ABtn label="Initialize SOL Accounts" onClick={handleInitSol} status={sec.sol.status} />
         <Err message={sec.sol.err} /><Ok message={sec.sol.ok} />
@@ -2019,11 +2099,14 @@ function AdminPanel({ program, provider }: { program: any; provider: any }) {
 
       {/* ─── SECTION: Initialize USDC Accounts ─── */}
       <div className="glass rounded-xl p-4 border-amber-500/10">
-        <h4 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
-          3. Initialize USDC Accounts
-          {sec.usdc.init && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-normal">✓ Initialized</span>}
-          {!sec.usdc.init && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-normal">Pending</span>}
-        </h4>
+        <h4 className="text-sm font-semibold text-amber-300 mb-1">3. Initialize USDC Accounts</h4>
+        <div className="flex items-center gap-2 mb-1">
+          {sec.usdc.init ? (
+            <span className="text-[11px] text-emerald-400">✓ Initialized</span>
+          ) : (
+            <span className="text-[11px] text-slate-500">Pending</span>
+          )}
+        </div>
         <p className="text-xs text-slate-500 mb-3">Creates staking pool, reward vault, and treasury for USDC.</p>
         <ABtn label="Initialize USDC Accounts" onClick={handleInitUsdc} status={sec.usdc.status} />
         <Err message={sec.usdc.err} /><Ok message={sec.usdc.ok} />
@@ -2045,11 +2128,14 @@ function AdminPanel({ program, provider }: { program: any; provider: any }) {
 
       {/* ─── SECTION: Create Pool ─── */}
       <div className="glass rounded-xl p-4 border-amber-500/10">
-        <h4 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
-          5. Create Liquidity Pool
-          {sec.pool.init && <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-normal">✓ Initialized</span>}
-          {!sec.pool.init && <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full font-normal">Pending</span>}
-        </h4>
+        <h4 className="text-sm font-semibold text-amber-300 mb-1">5. Create Liquidity Pool</h4>
+        <div className="flex items-center gap-2 mb-1">
+          {sec.pool.init ? (
+            <span className="text-[11px] text-emerald-400">✓ Initialized</span>
+          ) : (
+            <span className="text-[11px] text-slate-500">Pending</span>
+          )}
+        </div>
         <p className="text-xs text-slate-500 mb-3">Creates the SOL/USDC AMM pool. The fee is in basis points (30 = 0.3%).</p>
         <div className="mb-3">
           <Inp label="Fee (basis points)" val={feeBps} set={setFeeBps} ph="30" />
