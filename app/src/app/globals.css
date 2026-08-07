@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    background: #0a0f1e;
+    color: #e2e8f0;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(56, 189, 248, 0.1);
+    backdrop-filter: blur(16px);
+  }
+
+  .glass-hover:hover {
+    border-color: rgba(56, 189, 248, 0.3);
+    background: rgba(15, 23, 42, 0.95);
+  }
+
+  .glow {
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.08), 0 0 60px rgba(56, 189, 248, 0.03);
+  }
+
+  .glow-emerald {
+    box-shadow: 0 0 20px rgba(52, 211, 153, 0.08), 0 0 60px rgba(52, 211, 153, 0.03);
+  }
+
+  .glow-amber {
+    box-shadow: 0 0 20px rgba(251, 191, 36, 0.08), 0 0 60px rgba(251, 191, 36, 0.03);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, #38bdf8, #818cf8, #34d399);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-warn {
+    background: linear-gradient(135deg, #fbbf24, #f97316);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+/* Wallet adapter overrides */
+.wallet-adapter-button {
+  height: 40px !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  border-radius: 10px !important;
+  padding: 0 20px !important;
+  background: linear-gradient(135deg, #38bdf8, #818cf8) !important;
+  transition: all 0.2s !important;
+}
+
+.wallet-adapter-button:hover {
+  background: linear-gradient(135deg, #7dd3fc, #a5b4fc) !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: #0f172a !important;
+  border: 1px solid rgba(56, 189, 248, 0.15) !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: rgba(56, 189, 248, 0.1) !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.35s ease-out;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}

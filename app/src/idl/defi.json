@@ -1,0 +1,2497 @@
+{
+  "address": "FDwF1iC4FYJrAMK9ns7pSUjZdhaZRjQ857bsaQEyZ7B1",
+  "metadata": {
+    "name": "defi",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "add_liquidity",
+      "discriminator": [
+        181,
+        157,
+        89,
+        67,
+        143,
+        182,
+        52,
+        72
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_a",
+          "writable": true
+        },
+        {
+          "name": "user_token_b",
+          "writable": true
+        },
+        {
+          "name": "user_lp_token_account",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_a_mint",
+                "account": "Pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_b_mint",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_a",
+          "writable": true
+        },
+        {
+          "name": "pool_token_b",
+          "writable": true
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_a",
+          "type": "u64"
+        },
+        {
+          "name": "amount_b",
+          "type": "u64"
+        },
+        {
+          "name": "min_lp_to_mint",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "approve_action",
+      "discriminator": [
+        200,
+        117,
+        44,
+        13,
+        133,
+        139,
+        131,
+        36
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_action",
+      "discriminator": [
+        228,
+        144,
+        170,
+        146,
+        66,
+        88,
+        133,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_rewards",
+      "discriminator": [
+        4,
+        144,
+        132,
+        71,
+        116,
+        23,
+        151,
+        80
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_reward_token_account",
+          "writable": true
+        },
+        {
+          "name": "reward_vault_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reward_vault_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  117,
+                  115,
+                  100,
+                  99
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "close_stake_account",
+      "discriminator": [
+        246,
+        236,
+        59,
+        167,
+        115,
+        135,
+        122,
+        12
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "create_pool",
+      "discriminator": [
+        233,
+        146,
+        209,
+        142,
+        207,
+        104,
+        64,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_a_mint"
+              },
+              {
+                "kind": "account",
+                "path": "token_b_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_a_mint"
+        },
+        {
+          "name": "token_b_mint"
+        },
+        {
+          "name": "token_a_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_b_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  98
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  109,
+                  105,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_basis_points",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "emergency_remove_liquidity",
+      "discriminator": [
+        144,
+        86,
+        143,
+        141,
+        64,
+        122,
+        118,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_a",
+          "writable": true
+        },
+        {
+          "name": "user_token_b",
+          "writable": true
+        },
+        {
+          "name": "user_lp_token_account",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_a_mint",
+                "account": "Pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_b_mint",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_a",
+          "writable": true
+        },
+        {
+          "name": "pool_token_b",
+          "writable": true
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "lp_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "emergency_unstake",
+      "discriminator": [
+        123,
+        69,
+        168,
+        195,
+        183,
+        213,
+        199,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "staking_pool",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "flash_loan",
+      "discriminator": [
+        239,
+        246,
+        59,
+        224,
+        139,
+        20,
+        175,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "borrower",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "borrower_token_account",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_a_mint",
+                "account": "Pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_b_mint",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_a",
+          "writable": true
+        },
+        {
+          "name": "pool_token_b",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "clock",
+          "address": "SysvarC1ock11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "borrower_program_id",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "fund_reward_vault",
+      "discriminator": [
+        9,
+        198,
+        202,
+        115,
+        106,
+        247,
+        227,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        },
+        {
+          "name": "authority_token_account",
+          "writable": true
+        },
+        {
+          "name": "reward_vault",
+          "writable": true
+        },
+        {
+          "name": "stake_mint"
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize_sol_accounts",
+      "discriminator": [
+        163,
+        188,
+        78,
+        78,
+        162,
+        74,
+        189,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "staking_pool_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  105,
+                  110,
+                  103,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reward_vault_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  115,
+                  111,
+                  108
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_treasury_sol",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "sol_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "sol_mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_state",
+      "discriminator": [
+        190,
+        171,
+        224,
+        219,
+        217,
+        72,
+        199,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "signer1",
+          "type": "pubkey"
+        },
+        {
+          "name": "signer2",
+          "type": "pubkey"
+        },
+        {
+          "name": "signer3",
+          "type": "pubkey"
+        },
+        {
+          "name": "timelock_delay",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_usdc_accounts",
+      "discriminator": [
+        237,
+        53,
+        167,
+        120,
+        233,
+        21,
+        213,
+        117
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "staking_pool_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  105,
+                  110,
+                  103,
+                  95,
+                  112,
+                  111,
+                  111,
+                  108,
+                  95,
+                  117,
+                  115,
+                  100,
+                  99
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "reward_vault_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  119,
+                  97,
+                  114,
+                  100,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  117,
+                  115,
+                  100,
+                  99
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "protocol_treasury_usdc",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  116,
+                  111,
+                  99,
+                  111,
+                  108,
+                  95,
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "usdc_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "state"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "pause",
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "propose_action",
+      "discriminator": [
+        49,
+        249,
+        251,
+        197,
+        25,
+        74,
+        36,
+        5
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "action_type",
+          "type": {
+            "defined": {
+              "name": "ActionType"
+            }
+          }
+        },
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "remove_liquidity",
+      "discriminator": [
+        80,
+        85,
+        209,
+        72,
+        24,
+        206,
+        177,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_a",
+          "writable": true
+        },
+        {
+          "name": "user_token_b",
+          "writable": true
+        },
+        {
+          "name": "user_lp_token_account",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_a_mint",
+                "account": "Pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_b_mint",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_a",
+          "writable": true
+        },
+        {
+          "name": "pool_token_b",
+          "writable": true
+        },
+        {
+          "name": "lp_token_mint",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "lp_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_amount_a",
+          "type": "u64"
+        },
+        {
+          "name": "min_amount_b",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "stake",
+      "discriminator": [
+        206,
+        176,
+        202,
+        18,
+        200,
+        209,
+        179,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "staking_pool",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "swap",
+      "discriminator": [
+        248,
+        198,
+        158,
+        145,
+        225,
+        117,
+        135,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_in",
+          "writable": true
+        },
+        {
+          "name": "user_token_out",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_a_mint",
+                "account": "Pool"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_b_mint",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_token_a",
+          "writable": true
+        },
+        {
+          "name": "pool_token_b",
+          "writable": true
+        },
+        {
+          "name": "token_in"
+        },
+        {
+          "name": "token_out"
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "min_amount_out",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "unpause",
+      "discriminator": [
+        169,
+        144,
+        4,
+        38,
+        10,
+        141,
+        188,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unstake",
+      "discriminator": [
+        90,
+        95,
+        107,
+        42,
+        205,
+        124,
+        50,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "staking_pool",
+          "writable": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "update_flash_loan_callback_program",
+      "discriminator": [
+        93,
+        46,
+        19,
+        11,
+        70,
+        221,
+        189,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_reward_rate",
+      "discriminator": [
+        105,
+        157,
+        0,
+        185,
+        21,
+        144,
+        163,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_rewards",
+      "discriminator": [
+        188,
+        38,
+        124,
+        42,
+        87,
+        77,
+        176,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "state",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_stake",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "token_type",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Pool",
+      "discriminator": [
+        241,
+        154,
+        109,
+        4,
+        17,
+        177,
+        109,
+        188
+      ]
+    },
+    {
+      "name": "ProgramState",
+      "discriminator": [
+        77,
+        209,
+        137,
+        229,
+        149,
+        67,
+        167,
+        230
+      ]
+    },
+    {
+      "name": "UserStake",
+      "discriminator": [
+        102,
+        53,
+        163,
+        107,
+        9,
+        138,
+        87,
+        153
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ClaimEvent",
+      "discriminator": [
+        93,
+        15,
+        70,
+        170,
+        48,
+        140,
+        212,
+        219
+      ]
+    },
+    {
+      "name": "EmergencyRemoveLiquidityEvent",
+      "discriminator": [
+        130,
+        122,
+        20,
+        85,
+        40,
+        194,
+        39,
+        99
+      ]
+    },
+    {
+      "name": "EmergencyUnstakeEvent",
+      "discriminator": [
+        7,
+        90,
+        36,
+        159,
+        199,
+        94,
+        190,
+        125
+      ]
+    },
+    {
+      "name": "LiquidityAdded",
+      "discriminator": [
+        154,
+        26,
+        221,
+        108,
+        238,
+        64,
+        217,
+        161
+      ]
+    },
+    {
+      "name": "PoolCreated",
+      "discriminator": [
+        202,
+        44,
+        41,
+        88,
+        104,
+        220,
+        157,
+        82
+      ]
+    },
+    {
+      "name": "StakeEvent",
+      "discriminator": [
+        226,
+        134,
+        188,
+        173,
+        19,
+        33,
+        75,
+        175
+      ]
+    },
+    {
+      "name": "SwapEvent",
+      "discriminator": [
+        64,
+        198,
+        205,
+        232,
+        38,
+        8,
+        113,
+        226
+      ]
+    },
+    {
+      "name": "UnstakeEvent",
+      "discriminator": [
+        162,
+        104,
+        137,
+        228,
+        81,
+        3,
+        79,
+        197
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow"
+    },
+    {
+      "code": 6001,
+      "name": "Underflow",
+      "msg": "Arithmetic underflow"
+    },
+    {
+      "code": 6002,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6003,
+      "name": "Paused",
+      "msg": "Program is paused"
+    },
+    {
+      "code": 6004,
+      "name": "NotInEmergencyMode",
+      "msg": "Emergency mode not active (protocol must be paused)"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidAmount",
+      "msg": "Invalid amount"
+    },
+    {
+      "code": 6006,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient balance"
+    },
+    {
+      "code": 6007,
+      "name": "Slippage",
+      "msg": "Slippage tolerance exceeded"
+    },
+    {
+      "code": 6008,
+      "name": "NonProportionalLiquidity",
+      "msg": "Non-proportional liquidity"
+    },
+    {
+      "code": 6009,
+      "name": "InvariantViolation",
+      "msg": "Invariant violation"
+    },
+    {
+      "code": 6010,
+      "name": "InvalidMintOrder",
+      "msg": "Invalid mint order for pool"
+    },
+    {
+      "code": 6011,
+      "name": "ZeroRewards",
+      "msg": "No rewards to claim"
+    },
+    {
+      "code": 6012,
+      "name": "StakeAccountNotEmpty",
+      "msg": "Stake account is not empty. Unstake all tokens and claim all rewards first."
+    },
+    {
+      "code": 6013,
+      "name": "InsufficientLiquidity",
+      "msg": "Insufficient liquidity provided"
+    },
+    {
+      "code": 6014,
+      "name": "InsufficientStake",
+      "msg": "Insufficient stake amount"
+    },
+    {
+      "code": 6015,
+      "name": "InsufficientAmount",
+      "msg": "Amount below minimum required"
+    },
+    {
+      "code": 6016,
+      "name": "ExcessiveSwapAmount",
+      "msg": "Swap amount too large for pool stability"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidFeeAmount",
+      "msg": "Fee amount out of valid range"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidMint",
+      "msg": "Invalid mint for flash loan"
+    },
+    {
+      "code": 6019,
+      "name": "InsufficientSignatures",
+      "msg": "Insufficient signatures for multi-sig operation"
+    },
+    {
+      "code": 6020,
+      "name": "InvalidAction",
+      "msg": "Invalid action for timelock"
+    },
+    {
+      "code": 6021,
+      "name": "TimelockNotExpired",
+      "msg": "Timelock delay not expired"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidTokenType",
+      "msg": "Invalid token type. Must be 0 (SOL) or 1 (USDC)"
+    },
+    {
+      "code": 6023,
+      "name": "ProposalAlreadyActive",
+      "msg": "An active proposal already exists"
+    },
+    {
+      "code": 6024,
+      "name": "FlashLoanNotRepaid",
+      "msg": "Flash loan not repaid in same transaction"
+    },
+    {
+      "code": 6025,
+      "name": "FlashLoanTooLarge",
+      "msg": "Flash loan amount exceeds safety limit (max 50% of pool liquidity)"
+    },
+    {
+      "code": 6026,
+      "name": "InvalidCallbackProgram",
+      "msg": "Invalid flash loan callback program"
+    },
+    {
+      "code": 6027,
+      "name": "UnapprovedCallbackProgram",
+      "msg": "Flash loan callback program is not approved"
+    }
+  ],
+  "types": [
+    {
+      "name": "ActionType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pause"
+          },
+          {
+            "name": "Unpause"
+          },
+          {
+            "name": "UpdateRewardRate"
+          },
+          {
+            "name": "UpdateFlashLoanCallbackProgram"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ClaimEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyRemoveLiquidityEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_a",
+            "type": "u64"
+          },
+          {
+            "name": "amount_b",
+            "type": "u64"
+          },
+          {
+            "name": "lp_amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EmergencyUnstakeEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LiquidityAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_a",
+            "type": "u64"
+          },
+          {
+            "name": "amount_b",
+            "type": "u64"
+          },
+          {
+            "name": "lp_tokens",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingAction",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "action_type",
+            "type": {
+              "defined": {
+                "name": "ActionType"
+              }
+            }
+          },
+          {
+            "name": "proposed_at",
+            "type": "i64"
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          },
+          {
+            "name": "approvals",
+            "type": {
+              "array": [
+                "bool",
+                3
+              ]
+            }
+          },
+          {
+            "name": "created_by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "token_a_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_b_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_a_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_b_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "fee_basis_points",
+            "type": "u16"
+          },
+          {
+            "name": "k_last",
+            "type": "u128"
+          },
+          {
+            "name": "flash_loan_fee_basis_points",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_a",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_b",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProgramState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "signer1",
+            "type": "pubkey"
+          },
+          {
+            "name": "signer2",
+            "type": "pubkey"
+          },
+          {
+            "name": "signer3",
+            "type": "pubkey"
+          },
+          {
+            "name": "required_signatures",
+            "type": "u8"
+          },
+          {
+            "name": "total_staked_sol",
+            "type": "u64"
+          },
+          {
+            "name": "total_staked_usdc",
+            "type": "u64"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "reward_rate",
+            "type": "u64"
+          },
+          {
+            "name": "total_rewards_distributed",
+            "type": "u64"
+          },
+          {
+            "name": "staking_pool_sol_bump",
+            "type": "u8"
+          },
+          {
+            "name": "staking_pool_usdc_bump",
+            "type": "u8"
+          },
+          {
+            "name": "reward_vault_sol_bump",
+            "type": "u8"
+          },
+          {
+            "name": "reward_vault_usdc_bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_sol_bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_usdc_bump",
+            "type": "u8"
+          },
+          {
+            "name": "last_update_time",
+            "type": "i64"
+          },
+          {
+            "name": "reward_per_token_stored",
+            "type": "u128"
+          },
+          {
+            "name": "timelock_delay",
+            "type": "i64"
+          },
+          {
+            "name": "pending_action",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingAction"
+                }
+              }
+            }
+          },
+          {
+            "name": "upgrade_version",
+            "type": "u8"
+          },
+          {
+            "name": "precision",
+            "type": "u128"
+          },
+          {
+            "name": "min_stake_amount",
+            "type": "u64"
+          },
+          {
+            "name": "protocol_fee_basis_points",
+            "type": "u16"
+          },
+          {
+            "name": "flash_loan_callback_program",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StakeEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwapEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_in",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_out",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UnstakeEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserStake",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "staked_amount",
+            "type": "u64"
+          },
+          {
+            "name": "reward_per_token_paid",
+            "type": "u128"
+          },
+          {
+            "name": "pending_rewards",
+            "type": "u64"
+          },
+          {
+            "name": "token_type",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

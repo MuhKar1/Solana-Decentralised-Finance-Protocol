@@ -12,7 +12,7 @@ de_fi = "FDwF1iC4FYJrAMK9ns7pSUjZdhaZRjQ857bsaQEyZ7B1"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

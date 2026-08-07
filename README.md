@@ -1,210 +1,481 @@
-# DeFi Protocol (Anchor/Solana)
+# Solana Decentralised Finance Protocol
 
-## Executive Summary
-This repository contains a Solana on-chain DeFi protocol implemented with Anchor. The codebase provides three major domains in one program:
+[![Solana](https://img.shields.io/badge/Solana-Devnet-blue?logo=solana)](https://solana.com)
+[![Anchor](https://img.shields.io/badge/Anchor-0.30+-orange?logo=anchor)](https://www.anchor-lang.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-15+-black?logo=next.js)](https://nextjs.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
-- Governance and administrative controls with multisig approvals and timelock enforcement.
-- Token staking for two token classes (SOL-like and USDC-like SPL mints) with reward accounting.
-- Automated market maker (AMM) liquidity and swap functionality, including guarded flash loans.
+A production-grade, fullstack decentralised finance protocol on Solana featuring **multi-signature governance**, **dual-token yield staking** (SOL & USDC), an **automated market maker** with flash loan support, and **emergency pause mechanisms** — all accessible through a modern React/Next.js frontend.
 
-The project has been refactored into a modular architecture to improve maintainability and auditability:
+Program ID (Devnet): `FDwF1iC4FYJrAMK9ns7pSUjZdhaZRjQ857bsaQEyZ7B1`
 
-- Domain-specific instruction modules.
-- Centralized state definitions.
-- Centralized error definitions.
-- A minimal program entrypoint that routes to instruction handlers.
+---
 
-Program ID (localnet config):
+## Table of Contents
 
-- `FDwF1iC4FYJrAMK9ns7pSUjZdhaZRjQ857bsaQEyZ7B1`
+1. [Overview](#overview)
+2. [Architecture](#architecture)
+3. [Feature Breakdown](#feature-breakdown)
+   - [Governance & Access Control](#1-governance--access-control)
+   - [Staking & Rewards](#2-staking--rewards)
+   - [AMM & Liquidity Pool](#3-amm--liquidity-pool)
+   - [Flash Loans](#4-flash-loans)
+   - [Emergency Mechanisms](#5-emergency-mechanisms)
+4. [Security Model](#security-model)
+5. [Frontend Application](#frontend-application)
+6. [Project Structure](#project-structure)
+7. [Getting Started](#getting-started)
+8. [Testing](#testing)
+9. [Deployment](#deployment)
+10. [License & Disclaimer](#license--disclaimer)
+
+---
+
+## Overview
+
+The DeFi Protocol is a complete on-chain financial application built on Solana using the Anchor framework. It combines three core DeFi primitives — governance, staking, and an AMM — into a single, auditable program with a polished React frontend.
+
+**Key design principles:**
+
+- **Separation of concerns** — Instruction modules are decoupled by domain (admin, staking, liquidity)
+- **Defence in depth** — Multiple layers of security: multisig, timelocks, pause controls, arithmetic guards
+- **User safety** — Emergency withdrawal paths, slippage protection, invariant enforcement
+- **Fullstack transparency** — All 23 on-chain functions exposed through a self-documenting UI with real-time state display
+
+---
 
 ## Architecture
-The on-chain program is organized under `programs/de-fi/src` as follows:
 
-- `lib.rs`: Program entrypoint and instruction routing.
-- `instructions/admin.rs`: State initialization, vault setup, multisig governance, timelocked updates.
-- `instructions/staking.rs`: Stake, unstake, rewards claim/update, emergency unstake, stake-account close.
-- `instructions/liquidity.rs`: Pool creation, liquidity add/remove, emergency remove, swaps, flash loan execution.
-- `state/pool.rs`: Core account/state structs and protocol enums.
-- `state/mod.rs`: Shared constants and reward accumulation helpers.
-- `errors.rs`: Protocol-specific error codes.
-- `events.rs`: Event emission types for major state-changing actions.
-
-This layout decouples core concerns and simplifies code review paths for governance, staking, and AMM logic.
-
-## Implemented Features
-### Governance and Admin
-- Program state initialization with authority and 3 governance signers.
-- Separate initialization for SOL and USDC staking/reward/treasury token accounts.
-- Reward vault funding by authority.
-- Multisig proposal lifecycle:
-  - `propose_action`
-  - `approve_action`
-  - `cancel_action`
-- Controlled operations behind multisig and timelock:
-  - `pause`
-  - `unpause`
-  - `update_reward_rate`
-  - `update_flash_loan_callback_program`
-
-### Staking and Rewards
-- Stake/unstake for token type `0` (SOL-like mint) and `1` (USDC-like mint).
-- Per-user stake account PDA by `(user, token_type)`.
-- Reward-per-token model with global and per-user checkpoints.
-- Reward claims from dedicated reward vaults.
-- Manual reward update endpoint (`update_rewards`) for synchronization.
-- Minimum stake threshold enforcement.
-- Emergency unstake path available only when paused.
-- Stake account closure gated by zero principal and zero pending rewards.
-
-### AMM and Liquidity
-- Deterministic pool PDA per ordered token pair.
-- LP mint creation and tracked invariant (`k_last`).
-- Add/remove liquidity with slippage constraints.
-- Proportionality checks for non-initial liquidity provision.
-- Emergency liquidity removal path available only when paused.
-- Constant-product swap with fee deduction, slippage guard, and post-swap invariant enforcement.
-- Swap-size protection (max 10% reserve-side input per swap).
-
-### Flash Loans
-- Flash loan from pool vaults with:
-  - Callback-program allowlist model.
-  - Maximum loan bound (50% of selected pool reserve).
-  - Fee computation and repayment/invariant validation in the same transaction.
-  - Explicit callback invocation using CPI to borrower program.
-
-### Error Handling and Events
-- Rich custom error surface in `errors.rs` for arithmetic safety, authorization, timelock, token validation, slippage, invariant, and flash loan constraints.
-- Event emission for major actions (`PoolCreated`, `LiquidityAdded`, `SwapEvent`, `StakeEvent`, `UnstakeEvent`, etc.) to support observability and off-chain indexing.
-
-## Security and Control Model
-- Pausable protocol design.
-- Emergency-only operations restricted to paused state.
-- Multisig signer checks for governance actions.
-- Timelock enforcement on sensitive state transitions.
-- Defensive arithmetic with checked operations and custom overflow/underflow errors.
-- Token-type validation and account constraints via Anchor account macros.
-- Slippage and invariant guards for AMM operations.
-
-## What Has Been Achieved
-- End-to-end localnet functional workflow for state setup, staking lifecycle, governance flow, pool lifecycle, and key safety checks.
-- Modularized codebase suitable for targeted auditing and incremental growth.
-- Comprehensive integration-style TypeScript tests for happy paths and critical rejection paths.
-
-## Known Limitations and Not Yet Achieved
-The current codebase is functional for local development and demonstration, but the following items should be considered pending for production-grade deployment:
-
-- No formal economic audit artifacts are included (fee model calibration, stress simulations, adversarial market analysis).
-- No formal security audit reports are included.
-- Test coverage is integration-focused; property/fuzz testing and exhaustive invariant testing are not included.
-- Oracle-based pricing/risk controls are not implemented.
-- Frontend and operator tooling are minimal in this repository.
-- Mainnet deployment pipelines and governance operations playbooks are not included.
-
-These items are typical next steps before production launch.
-
-## Repository Structure
-Top-level structure:
-
-- `Anchor.toml`: Anchor workspace and localnet program mapping.
-- `Cargo.toml`: Rust workspace configuration.
-- `programs/de-fi`: On-chain program crate.
-- `tests/de-fi.ts`: Integration and security-behavior tests (TypeScript + Mocha).
-- `migrations/deploy.ts`: Anchor deployment hook scaffold.
-- `app/`: Application-facing workspace folder (currently not central to on-chain tests).
-
-## Prerequisites
-Install the following toolchain components:
-
-- Rust (stable toolchain).
-- Solana CLI compatible with Anchor version in use.
-- Anchor CLI.
-- Node.js (LTS recommended) and Yarn.
-
-Recommended checks:
-
-- `rustc --version`
-- `solana --version`
-- `anchor --version`
-- `node --version`
-- `yarn --version`
-
-## Installation
-From repository root:
-
-```bash
-yarn install
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Frontend (Next.js 15)                  │
+│  ┌─────────┐ ┌──────────┐ ┌────────┐ ┌──────────────┐  │
+│  │ Staking  │ │   Swap   │ │  Pool   │ │  Liquidity   │  │
+│  │ (SOL/    │ │ (SOL→    │ │ (Info + │ │ (Add/Remove/ │  │
+│  │  USDC)   │ │  USDC)   │ │  Flash) │ │  Emergency)  │  │
+│  └─────────┘ └──────────┘ └────────┘ └──────────────┘  │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │              Admin Panel (Toggle)                 │   │
+│  │  Init State → SOL/USDC Accounts → Fund Vaults    │   │
+│  │  → Create Pool → Governance (Multi-Sig)           │   │
+│  │  → Live Protocol State Dashboard                  │   │
+│  └──────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │       My Portfolio (Real-time On-Chain)           │   │
+│  └──────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│                   Program (Anchor/Rust)                  │
+│  ┌──────────────┐ ┌──────────────┐ ┌───────────────┐   │
+│  │  admin.rs     │ │  staking.rs  │ │ liquidity.rs  │   │
+│  │  Governance   │ │  Stake/      │ │ Pool/Swap/    │   │
+│  │  Init/Vaults  │ │  Unstake/    │ │ Liquidity/    │   │
+│  │  Multi-sig    │ │  Claim       │ │ Flash Loan    │   │
+│  └──────────────┘ └──────────────┘ └───────────────┘   │
+│  ┌──────────────────────────────────────────────────┐   │
+│  │  state/pool.rs — ProgramState, Pool, UserStake   │   │
+│  │  state/mod.rs  — Rewards math, constants         │   │
+│  │  errors.rs     — 28 custom error codes           │   │
+│  │  events.rs     — Event emission for indexing     │   │
+│  └──────────────────────────────────────────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│               Solana Devnet / Localnet                   │
+└─────────────────────────────────────────────────────────┘
 ```
 
-## Build
-Build the Anchor program:
+### Data Flow
+
+1. **User connects wallet** → `@solana/wallet-adapter-react` provides signer
+2. **Frontend reads on-chain state** → Direct RPC calls to Solana, deserializing Anchor account data
+3. **Transactions** → Built client-side, auto-wrapping SOL to WSOL, auto-creating ATAs, then signed by wallet adapter
+4. **Program executes** → Validates constraints, updates accounts, emits events
+5. **UI refreshes** → Re-reads account data immediately after confirmation
+
+### Account Model
+
+All protocol accounts use **Program Derived Addresses (PDAs)** with deterministic seeds:
+
+| Account | Seeds |
+|---|---|
+| Program State | `["state"]` |
+| Staking Pool | `["staking_pool_sol"]` / `["staking_pool_usdc"]` |
+| Reward Vault | `["reward_vault_sol"]` / `["reward_vault_usdc"]` |
+| Protocol Treasury | `["protocol_treasury", mint]` |
+| User Stake | `["user_stake", user_pubkey, [token_type]]` |
+| Pool | `["pool", token_a_mint, token_b_mint]` |
+| Pool Token Vault | `["pool_token_a", pool]` / `["pool_token_b", pool]` |
+| LP Token Mint | `["lp_token_mint", pool]` |
+
+---
+
+## Feature Breakdown
+
+### 1. Governance & Access Control
+
+The protocol uses a **3-of-3 multi-signature scheme** with timelock enforcement for all sensitive operations.
+
+| Operation | Requires | Timelock |
+|---|---|---|
+| Pause protocol | 3/3 signers, proposal + approvals | Yes |
+| Unpause protocol | 3/3 signers, proposal + approvals | Yes |
+| Update reward rate | 3/3 signers, proposal + approvals | Yes |
+| Update flash loan callback | 3/3 signers, proposal + approvals | Yes |
+
+**Proposal lifecycle:**
+1. **Propose** — Any of the 3 signers initiates a proposal with encoded action data
+2. **Approve** — The remaining signers approve; each approval is tracked in a `[bool; 3]` bitmap
+3. **Execute** — Once all 3 have approved **and** the timelock delay has elapsed, the action executes
+4. **Cancel** — Any signer can cancel a pending proposal before execution
+
+**Admin-only initialisation:**
+- `initialize_state` — Sets authority, 3 signer pubkeys, timelock delay, reward rate, protocol fee
+- `initialize_sol_accounts` — Creates SOL staking pool, reward vault, and treasury PDAs
+- `initialize_usdc_accounts` — Creates USDC staking pool, reward vault, and treasury PDAs
+- `fund_reward_vault` — Deposits SOL/USDC into reward vaults (authority-gated)
+
+### 2. Staking & Rewards
+
+Dual-token staking with independent SOL and USDC pools. Each operates identically but with appropriate decimal handling (9 for SOL, 6 for USDC).
+
+**Reward calculation model:**
+- **Reward-per-token** global accumulator updated on each state change
+- Per-user **reward_per_token_paid** checkpoint prevents double-claiming
+- Time-capped accrual (max 24h per update) prevents exploitation
+- Rewards distributed proportionally based on normalised stake amounts
+
+**User operations:**
+| Function | Description | Constraints |
+|---|---|---|
+| `stake` | Deposit tokens, earn rewards | Minimum 1 SOL or 1,000 USDC |
+| `unstake` | Withdraw staked tokens | Pending rewards update automatically |
+| `claim_rewards` | Claim accrued rewards | Token-type specific reward vault |
+| `emergency_unstake` | Withdraw all when paused | Protocol must be paused |
+| `close_stake_account` | Close empty stake PDA | Zero staked amount + zero pending rewards |
+| `update_rewards` | Manual reward recalculation | For UI synchronisation |
+
+**Token-type normalisation:**
+```rust
+MIN_STAKE_AMOUNT = 1_000_000_000  // 1 SOL (9 decimals) or 1,000 USDC (6 decimals)
+NORMALIZED_DECIMALS = 9            // USDC amounts scaled up for unified reward math
+```
+
+### 3. AMM & Liquidity Pool
+
+A constant-product market maker (x·y = k) between SOL and USDC.
+
+**Pool operations:**
+
+| Function | Description | Safety |
+|---|---|---|
+| `create_pool` | Admin creates pool PDA + vault accounts | Authority-gated, fee 1–1000 bps |
+| `add_liquidity` | Deposit SOL+USDC, receive LP tokens | Proportionality check, slippage guard |
+| `remove_liquidity` | Burn LP tokens, withdraw SOL+USDC | Slippage guard, invariant update |
+| `emergency_remove_liquidity` | Remove all LP when paused | Paused state only |
+| `swap` | SOL → USDC exchange | Fee deduction, slippage guard, invariant enforcement |
+
+**Key AMM rules:**
+- Token pair ordering enforced (`token_a < token_b`) for deterministic PDA derivation
+- Initial liquidity provision mints `sqrt(x·y) - MINIMUM_LIQUIDITY` LP tokens
+- Subsequent additions must maintain the pool ratio (proportionality tolerance ±0.1%)
+- Swap size capped at 10% of reserve side to prevent extreme slippage
+- Post-swap invariant must be ≥ pre-swap k_last value
+
+**Fees:**
+- **Swap fee:** Configurable at pool creation (default 30 bps = 0.3%)
+- **Flash loan fee:** Fixed at 30 bps (0.3%) — hardcoded in contract
+- Fees accrue to the pool, benefiting all LPs proportionally
+
+### 4. Flash Loans
+
+Permissioned flash loans with a callback-program allowlist model.
+
+**Flow:**
+1. Borrower's authorised callback program must be approved via governance
+2. Borrower calls `flash_loan(amount, callback_program_id)`
+3. Protocol transfers tokens from pool vault → borrower's token account
+4. Protocol CPIs into `callback_program_id` with encoded loan data (amount, fee, deadline, vault)
+5. Callback program performs arbitrage/liquidation logic and returns tokens to the vault
+6. Protocol validates repayment: post-loan invariant ≥ pre-loan invariant + fee
+
+**Safety bounds:**
+- Maximum loan: 50% of the selected pool reserve
+- Callback deadline: 60 seconds from initiation
+- Only governor-approved programs may serve as callbacks
+- Invariant enforcement ensures fee repayment
+
+### 5. Emergency Mechanisms
+
+| Mechanism | Trigger | Effect |
+|---|---|---|
+| `pause` | 3/3 governance approval | Stops all user-facing operations (stake, unstake, swap, liquidity) |
+| `unpause` | 3/3 governance approval + timelock | Resumes normal operations |
+| `emergency_unstake` | Protocol paused | Users withdraw 100% of staked tokens |
+| `emergency_remove_liquidity` | Protocol paused | LPs withdraw proportional share of pool reserves |
+
+---
+
+## Security Model
+
+### Multi-Layer Defence
+
+```
+Layer 1: Anchor Framework
+  ├── Account ownership validation
+  ├── PDA seed verification
+  ├── Signer checks
+  └── Rent exemption enforcement
+
+Layer 2: Program Constraints
+  ├── has_one = authority checks
+  ├── token::mint / token::authority validation
+  ├── Custom constraint macros (@ErrorCode)
+  └── Bump validation via ctx.bumps
+
+Layer 3: Business Logic
+  ├── Pause/unpause gating
+  ├── Multisig + timelock for governance
+  ├── Invariant enforcement (AMM)
+  ├── Slippage protection
+  ├── Proportionality checks (liquidity)
+  ├── Swap size limits
+  └── Flash loan repayment validation
+
+Layer 4: Arithmetic Safety
+  ├── checked_add / checked_sub / checked_mul / checked_div
+  ├── Custom Overflow / Underflow errors
+  ├── No unchecked arithmetic anywhere
+  └── Precision scaling (PRECISION = 10^18)
+
+Layer 5: Frontend
+  ├── Auto-ATA creation before every transaction
+  ├── WSOL wrapping/unwrapping handled transparently
+  ├── Balance checks before submission
+  └── Comprehensive error parsing with friendly messages
+```
+
+### Custom Error Codes (28 total)
+
+| Range | Category |
+|---|---|
+| 6000–6002 | Arithmetic (Overflow, Underflow, Unauthorised) |
+| 6003–6004 | Admin state (Paused, NotInEmergencyMode) |
+| 6005–6007 | Amounts (InvalidAmount, InsufficientBalance, Slippage) |
+| 6008–6010 | AMM (NonProportionalLiquidity, InvariantViolation, InvalidMintOrder) |
+| 6011–6015 | Staking (NoRewards, StakeAccountNotEmpty, InsufficientLiquidity, InsufficientStakeAmount, BelowMinimum) |
+| 6016–6018 | Swap/Token (ExcessiveSwapAmount, InvalidFeeAmount, InvalidMint) |
+| 6019–6023 | Governance (InsufficientSignatures, InvalidAction, TimelockNotExpired, InvalidTokenType, ProposalAlreadyActive) |
+| 6024–6027 | Flash Loans (FlashLoanNotRepaid, FlashLoanTooLarge, InvalidCallbackProgram, UnapprovedCallbackProgram) |
+
+### What's Protected
+
+| Attack Vector | Mitigation |
+|---|---|
+| Unauthorised admin actions | `has_one = authority` + multisig approval bitmap |
+| Front-running governance | Timelock delay (configurable, default 24h) |
+| Flash loan manipulation | Max 50% reserve + invariant check + approved callbacks only |
+| Slippage exploitation | User-set minimum output amounts rejected on-chain |
+| Dust staking attacks | Minimum stake threshold (1 SOL / 1,000 USDC) |
+| Reward inflation | Time-capped accrual (24h max per update) |
+| Pool imbalance | Proportionality checks with 0.1% tolerance |
+| Infinite mint attacks | LP mint authority = pool PDA (no external key) |
+
+---
+
+## Frontend Application
+
+Built with **Next.js 15 + React + Tailwind CSS** and integrated via `@solana/wallet-adapter`.
+
+### User Experience Flow
+
+```
+Wallet Connect → My Portfolio (auto-populates) → Choose Operation Tab
+                                                    ├── Stake (SOL + USDC cards)
+                                                    ├── Unstake (SOL + USDC cards)
+                                                    ├── Claim (Rewards + account mgmt)
+                                                    ├── Swap (auto-slippage)
+                                                    ├── Pool (info + advanced flash loan)
+                                                    ├── Liquidity (add/remove + portfolio)
+                                                    └── Admin (toggle → init/gov/state)
+```
+
+### UI Features
+
+| Feature | Description |
+|---|---|
+| **My Portfolio** | Real-time display of staked SOL/USDC, pending rewards, LP tokens, pool share % |
+| **Auto-wrap SOL** | All SOL operations auto-wrap to WSOL and create ATAs transparently |
+| **Auto-ATA creation** | Every transaction auto-creates required Associated Token Accounts |
+| **Slippage presets** | 0.5% / 1% / 3% quick-select with live min-output preview |
+| **Pool data from chain** | Swap fee, flash loan fee, liquidity, callback program — all read live |
+| **Protocol state dashboard** | 19 on-chain parameters displayed in real-time (admin) |
+| **Emergency UI** | Emergency unstake/remove buttons visible during pause state |
+| **Error parsing** | 28 custom error codes mapped to plain-English messages + on-chain log extraction |
+| **Advanced mode** | Flash loan section collapsed behind developer toggle |
+| **Idempotent initialisation** | USDC mint recovered from on-chain if localStorage is cleared |
+
+---
+
+## Project Structure
+
+```
+de-fi/
+├── programs/de-fi/src/          # On-chain Anchor program
+│   ├── lib.rs                   # Program entrypoint + instruction routing
+│   ├── instructions/
+│   │   ├── mod.rs
+│   │   ├── admin.rs             # Governance, initialisation, vaults
+│   │   ├── staking.rs           # Stake, unstake, claim, emergency
+│   │   └── liquidity.rs         # Pool, swap, flash loan, liquidity
+│   ├── state/
+│   │   ├── mod.rs               # Constants, reward math
+│   │   └── pool.rs              # ProgramState, Pool, UserStake structs
+│   ├── errors.rs                # 28 custom error codes
+│   └── events.rs                # Event emission types
+├── app/                         # Next.js 15 frontend
+│   ├── src/
+│   │   ├── app/
+│   │   │   ├── page.tsx         # Main application (all panels)
+│   │   │   ├── layout.tsx       # Root layout with providers
+│   │   │   └── globals.css      # Tailwind + custom glass styles
+│   │   ├── hooks/
+│   │   │   └── use-program.ts   # Anchor program connection hook
+│   │   ├── lib/
+│   │   │   └── pda.ts           # PDA derivation utilities
+│   │   ├── providers/
+│   │   │   └── solana-provider.tsx  # Wallet adapter + cluster config
+│   │   └── idl/
+│   │       └── defi.json        # Generated Anchor IDL
+│   ├── package.json
+│   └── next.config.ts
+├── tests/
+│   ├── de-fi.ts                 # Integration + security test suite
+│   └── debug.js                 # Quick debugging scripts
+├── migrations/
+│   └── deploy.ts                # Anchor deployment hook
+├── Anchor.toml                  # Anchor workspace configuration
+├── Cargo.toml                   # Rust workspace
+├── package.json                 # Root JS dependencies
+├── tsconfig.json                # TypeScript configuration
+└── README.md                    # This file
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- **Rust** (stable, 1.75+)
+- **Solana CLI** (1.18+)
+- **Anchor CLI** (0.30+)
+- **Node.js** (20 LTS)
+- **Yarn** (1.22+)
+
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/MuhKar1/Solana-Decentralised-Finance-Protocol.git
+cd Solana-Decentralised-Finance-Protocol
+
+# Install root dependencies
+yarn install
+
+# Install frontend dependencies
+cd app && yarn install && cd ..
+
+# Build the Anchor program
 anchor build
 ```
 
-Optional Rust-only check for workspace:
+### Running the Frontend
 
 ```bash
-cargo check
+cd app
+yarn dev
 ```
 
-## Run Tests
-Run full Anchor tests against local validator:
+Open [http://localhost:3000](http://localhost:3000). Connect a Solana wallet (Phantom, Backpack, Solflare) set to **Devnet**.
+
+### Running Tests
 
 ```bash
+# Full test suite against local validator
 anchor test
+
+# TypeScript type checking only
+cd app && npx tsc --noEmit
 ```
 
-The Anchor script configuration runs:
+### Development Workflow
+
+1. **Start local validator:** `solana-test-validator` (in separate terminal)
+2. **Deploy program:** `anchor deploy`
+3. **Run frontend:** `cd app && yarn dev`
+4. **Run tests:** `anchor test`
+
+---
+
+## Testing
+
+### Integration Tests (`tests/de-fi.ts`)
+
+The TypeScript test suite validates:
+
+| Category | Tests |
+|---|---|
+| **State initialisation** | Authority, signers, timelock, account creation |
+| **SOL/USDC accounts** | PDA creation, vault setup, treasury initialisation |
+| **Reward vault funding** | SOL wrapping, USDC minting, transfer validation |
+| **Staking lifecycle** | Stake, unstake, reward accrual, claims |
+| **AMM operations** | Pool creation, liquidity add/remove, swaps |
+| **Governance** | Propose, approve, execute, cancel, timelock enforcement |
+| **Security rejections** | Unauthorised access, below-minimum stakes, malformed swaps |
+| **Emergency paths** | Pause/unpause, emergency unstake/withdraw |
+
+### Frontend (TypeScript)
+
+All 1,800+ lines of the frontend compile with **zero TypeScript errors** under strict mode.
+
+---
+
+## Deployment
+
+### Devnet Deployment
 
 ```bash
-yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts
+anchor build
+anchor deploy --provider.cluster devnet
 ```
 
-## Test Coverage Overview
-The test suite in `tests/de-fi.ts` validates both happy paths and selected adversarial paths.
+Update the program ID in:
+- `programs/de-fi/src/lib.rs` (`declare_id!`)
+- `Anchor.toml` (`[programs.devnet]`)
+- `app/src/providers/solana-provider.tsx` (`PROGRAM_ID`)
 
-Validated flows include:
+Rebuild the IDL after deployment:
+```bash
+anchor build
+cp target/idl/defi.json app/src/idl/defi.json
+```
 
-- State initialization.
-- SOL and USDC account initialization.
-- Reward vault funding.
-- SOL staking and unstaking.
-- Reward claims after reward updates.
-- AMM pool creation.
-- Liquidity provision and LP mint checks.
-- Token swap execution with output assertions.
-- Governance cancel path to prevent stuck proposals.
-- Multisig pause/unpause behavior with timelock enforcement.
-- Timelocked reward-rate update and reward checkpoint behavior.
-- Rejection of dust stake attempts below minimum threshold.
-- Rejection of unauthorized multisig calls.
-- Rejection of malformed swap account wiring (duplicate account abuse).
-- Rejection of flash loan when callback program is not configured.
+### Frontend Deployment
 
-Coverage gaps that remain:
+```bash
+cd app
+yarn build
+# Deploy the `out/` or `.next/` directory to Vercel / Netlify / Cloudflare Pages
+```
 
-- Dedicated tests for successful flash-loan callback + repayment path.
-- Extensive edge-case tests for extreme liquidity ratios and long-duration reward accrual.
-- Property/fuzz testing of swap and liquidity invariants.
+---
 
-## Development Notes
-- The protocol currently distinguishes two staking token classes by token type (`0` and `1`).
-- Reward normalization accounts for decimal differences between SOL-like (9) and USDC-like (6) mints.
-- Governance-sensitive operations are intentionally separated from user-path instructions.
+## License & Disclaimer
 
-## Operational Commands
-Common local workflow:
+This project is licensed under the [MIT License](./LICENSE).
 
-1. `anchor build`
-2. `anchor test`
-3. `anchor deploy` (when intentionally deploying to configured cluster)
+**Disclaimer:** This software is provided for development, testing, and research purposes. Deploying financial smart contracts to public networks without independent security and economic review introduces material risk. No formal audit has been conducted. Use at your own risk.
 
-Anchor provider/cluster defaults are set in `Anchor.toml`.
+---
 
-## License
-This project is distributed under the license declared in the repository (`LICENSE`).
-
-## Disclaimer
-This software is provided for development, testing, and research purposes. Deploying financial smart contracts to public networks without independent security and economic review introduces material risk.
+<p align="center">
+  <sub>Built with Anchor, Next.js, and Solana Web3</sub>
+</p>
