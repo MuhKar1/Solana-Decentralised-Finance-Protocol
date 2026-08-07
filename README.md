@@ -1,4 +1,9 @@
-**Solana Decentralised Finance Protocol**
+# Solana Decentralised Finance Protocol
+
+[![Solana](https://img.shields.io/badge/Solana-Devnet-blue?logo=solana)](https://solana.com)
+[![Anchor](https://img.shields.io/badge/Anchor-0.30+-orange?logo=anchor)](https://www.anchor-lang.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-15+-black?logo=next.js)](https://nextjs.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
 A production-grade, fullstack decentralised finance protocol on Solana featuring **multi-signature governance**, **dual-token yield staking** (SOL & USDC), an **automated market maker** with flash loan support, and **emergency pause mechanisms** — all accessible through a modern React/Next.js frontend.
 
