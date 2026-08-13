@@ -14,14 +14,11 @@ pub const MINIMUM_LIQUIDITY: u64 = 1_000;
 pub const NORMALIZED_DECIMALS: u32 = 9;
 
 fn get_normalized_total_staked(state: &Account<ProgramState>) -> Result<u128> {
-    let normalized_sol = state.total_staked_sol as u128;
-    let usdc_scale_factor = 10u128.pow(NORMALIZED_DECIMALS - 6);
-    let normalized_usdc = (state.total_staked_usdc as u128)
-        .checked_mul(usdc_scale_factor)
-        .ok_or(ErrorCode::Overflow)?;
-
-    Ok(normalized_sol
-        .checked_add(normalized_usdc)
+    // Both SOL (9 decimals) and USDC (6 decimals) are already expressed in the
+    // same raw "base unit" magnitude (see TokenKind::normalize_amount).
+    // No decimal rescaling is required; 1e9 raw units == 1 SOL == 1,000 USDC.
+    Ok((state.total_staked_sol as u128)
+        .checked_add(state.total_staked_usdc as u128)
         .ok_or(ErrorCode::Overflow)?)
 }
 
@@ -84,4 +81,87 @@ pub fn update_rewards_internal(
 
     user_stake.reward_per_token_paid = state.reward_per_token_stored;
     Ok(())
+}
+
+/// Validate the three multisig signers at initialization:
+///   - no signer may be the zero (default) pubkey,
+///   - all three must be unique,
+///   - the required threshold must not exceed the number of valid signers.
+///
+/// Extracted as a pure function so it can be unit-tested independently of
+/// on-chain account state.
+pub fn validate_multisig_signers(s1: Pubkey, s2: Pubkey, s3: Pubkey) -> Result<()> {
+    require!(s1 != Pubkey::default(), ErrorCode::InvalidMultisigSigner);
+    require!(s2 != Pubkey::default(), ErrorCode::InvalidMultisigSigner);
+    require!(s3 != Pubkey::default(), ErrorCode::InvalidMultisigSigner);
+
+    require!(s1 != s2, ErrorCode::DuplicateSigner);
+    require!(s1 != s3, ErrorCode::DuplicateSigner);
+    require!(s2 != s3, ErrorCode::DuplicateSigner);
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pk(b: u8) -> Pubkey {
+        let mut arr = [0u8; 32];
+        arr[0] = b;
+        Pubkey::new_from_array(arr)
+    }
+
+    #[test]
+    fn rejects_zero_signer1() {
+        assert_eq!(
+            validate_multisig_signers(Pubkey::default(), pk(2), pk(3)).unwrap_err(),
+            ErrorCode::InvalidMultisigSigner.into()
+        );
+    }
+
+    #[test]
+    fn rejects_zero_signer2() {
+        assert_eq!(
+            validate_multisig_signers(pk(1), Pubkey::default(), pk(3)).unwrap_err(),
+            ErrorCode::InvalidMultisigSigner.into()
+        );
+    }
+
+    #[test]
+    fn rejects_zero_signer3() {
+        assert_eq!(
+            validate_multisig_signers(pk(1), pk(2), Pubkey::default()).unwrap_err(),
+            ErrorCode::InvalidMultisigSigner.into()
+        );
+    }
+
+    #[test]
+    fn rejects_signer1_equals_signer2() {
+        assert_eq!(
+            validate_multisig_signers(pk(1), pk(1), pk(3)).unwrap_err(),
+            ErrorCode::DuplicateSigner.into()
+        );
+    }
+
+    #[test]
+    fn rejects_signer1_equals_signer3() {
+        assert_eq!(
+            validate_multisig_signers(pk(1), pk(2), pk(1)).unwrap_err(),
+            ErrorCode::DuplicateSigner.into()
+        );
+    }
+
+    #[test]
+    fn rejects_signer2_equals_signer3() {
+        assert_eq!(
+            validate_multisig_signers(pk(1), pk(2), pk(2)).unwrap_err(),
+            ErrorCode::DuplicateSigner.into()
+        );
+    }
+
+    #[test]
+    fn accepts_three_unique_signers() {
+        assert!(validate_multisig_signers(pk(1), pk(2), pk(3)).is_ok());
+    }
 }

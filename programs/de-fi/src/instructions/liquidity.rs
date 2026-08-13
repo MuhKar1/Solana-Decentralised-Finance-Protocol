@@ -14,13 +14,13 @@ pub struct CreatePool<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 1 + 32 + 32 + 32 + 32 + 32 + 2 + 16 + 2,
+        space = 8 + 1 + 32 + 32 + 32 + 32 + 32 + 32 + 2 + 16 + 2,
         seeds = [b"pool", token_a_mint.key().as_ref(), token_b_mint.key().as_ref()],
         bump
     )]
     pub pool: Account<'info, Pool>,
-    pub token_a_mint: Account<'info, Mint>,
-    pub token_b_mint: Account<'info, Mint>,
+    pub token_a_mint: Box<Account<'info, Mint>>,
+    pub token_b_mint: Box<Account<'info, Mint>>,
     #[account(
         init,
         payer = authority,
@@ -29,7 +29,7 @@ pub struct CreatePool<'info> {
         seeds = [b"pool_token_a", pool.key().as_ref()],
         bump
     )]
-    pub token_a_account: Account<'info, TokenAccount>,
+    pub token_a_account: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
         payer = authority,
@@ -38,7 +38,7 @@ pub struct CreatePool<'info> {
         seeds = [b"pool_token_b", pool.key().as_ref()],
         bump
     )]
-    pub token_b_account: Account<'info, TokenAccount>,
+    pub token_b_account: Box<Account<'info, TokenAccount>>,
     #[account(
         init,
         payer = authority,
@@ -47,7 +47,16 @@ pub struct CreatePool<'info> {
         seeds = [b"lp_token_mint", pool.key().as_ref()],
         bump
     )]
-    pub lp_token_mint: Account<'info, Mint>,
+    pub lp_token_mint: Box<Account<'info, Mint>>,
+    #[account(
+        init,
+        payer = authority,
+        token::mint = lp_token_mint,
+        token::authority = pool,
+        seeds = [b"lp_lock_account", pool.key().as_ref()],
+        bump
+    )]
+    pub lp_lock_account: Box<Account<'info, TokenAccount>>,
     #[account(mut, has_one = authority, seeds = [b"state"], bump)]
     pub state: Account<'info, ProgramState>,
     #[account(mut)]
@@ -114,6 +123,11 @@ pub struct AddLiquidity<'info> {
     pub pool_token_b: Box<Account<'info, TokenAccount>>,
     #[account(mut, constraint = lp_token_mint.key() == pool.lp_token_mint)]
     pub lp_token_mint: Box<Account<'info, Mint>>,
+    #[account(
+        mut,
+        constraint = lp_lock_account.key() == pool.lp_lock_account
+    )]
+    pub lp_lock_account: Box<Account<'info, TokenAccount>>,
     #[account(mut, seeds = [b"state"], bump)]
     pub state: Box<Account<'info, ProgramState>>,
     pub token_program: Program<'info, Token>,
@@ -232,6 +246,7 @@ pub fn create_pool(ctx: Context<CreatePool>, fee_basis_points: u16) -> Result<()
     pool.token_a_account = ctx.accounts.token_a_account.key();
     pool.token_b_account = ctx.accounts.token_b_account.key();
     pool.lp_token_mint = ctx.accounts.lp_token_mint.key();
+    pool.lp_lock_account = ctx.accounts.lp_lock_account.key();
     pool.fee_basis_points = fee_basis_points;
     pool.k_last = 0;
     pool.flash_loan_fee_basis_points = 30;
@@ -463,7 +478,7 @@ pub fn add_liquidity(
     )?;
 
     let total_supply = ctx.accounts.lp_token_mint.supply;
-    let lp_to_mint = if total_supply == 0 {
+    let (lp_to_mint, lock_to_mint) = if total_supply == 0 {
         let product = (amount_a as u128)
             .checked_mul(amount_b as u128)
             .ok_or(ErrorCode::Overflow)?;
@@ -480,9 +495,15 @@ pub fn add_liquidity(
         let sqrt_k = z as u64;
         require!(sqrt_k > MINIMUM_LIQUIDITY, ErrorCode::InsufficientLiquidity);
 
-        sqrt_k
+        // Standard Uniswap V2-style first-depositor protection: mint the full
+        // sqrt(k) and permanently lock MINIMUM_LIQUIDITY LP tokens in a
+        // PDA-owned lock account. The locked tokens are kept out of the
+        // provider's withdrawable balance and keep total supply bounded away
+        // from zero.
+        let user_mint = sqrt_k
             .checked_sub(MINIMUM_LIQUIDITY)
-            .ok_or(ErrorCode::InsufficientLiquidity)?
+            .ok_or(ErrorCode::InsufficientLiquidity)?;
+        (user_mint, MINIMUM_LIQUIDITY)
     } else {
         let lp_amount_a = (amount_a as u128)
             .checked_mul(total_supply as u128)
@@ -496,7 +517,7 @@ pub fn add_liquidity(
             .checked_div(pool_token_b_amount as u128)
             .ok_or(ErrorCode::Overflow)?;
 
-        lp_amount_a.min(lp_amount_b) as u64
+        (lp_amount_a.min(lp_amount_b) as u64, 0)
     };
 
     require!(lp_to_mint >= min_lp_to_mint, ErrorCode::Slippage);
@@ -507,6 +528,25 @@ pub fn add_liquidity(
         token_b_mint.as_ref(),
         &[ctx.bumps.pool],
     ];
+
+    // Mint the permanent minimum-liquidity lock. This account is owned by the
+    // pool PDA and has no withdrawal instruction, so these LP tokens can never
+    // be removed from the pool.
+    if lock_to_mint > 0 {
+        token::mint_to(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                MintTo {
+                    mint: ctx.accounts.lp_token_mint.to_account_info(),
+                    to: ctx.accounts.lp_lock_account.to_account_info(),
+                    authority: ctx.accounts.pool.to_account_info(),
+                },
+                &[&seeds[..]],
+            ),
+            lock_to_mint,
+        )?;
+    }
+
     token::mint_to(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),

@@ -54,6 +54,7 @@ describe("de-fi functional tests", () => {
   let poolTokenAAccountPda: anchor.web3.PublicKey;
   let poolTokenBAccountPda: anchor.web3.PublicKey;
   let lpTokenMintPda: anchor.web3.PublicKey;
+  let lpLockAccountPda: anchor.web3.PublicKey;
   let userLpAta: anchor.web3.PublicKey;
 
   async function transferSol(
@@ -284,6 +285,11 @@ describe("de-fi functional tests", () => {
       program.programId
     )[0];
 
+    lpLockAccountPda = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("lp_lock_account"), poolPda.toBuffer()],
+      program.programId
+    )[0];
+
     userLpAta = getAssociatedTokenAddressSync(
       lpTokenMintPda,
       user.publicKey
@@ -498,6 +504,7 @@ describe("de-fi functional tests", () => {
         tokenAAccount: poolTokenAAccountPda,
         tokenBAccount: poolTokenBAccountPda,
         lpTokenMint: lpTokenMintPda,
+        lpLockAccount: lpLockAccountPda,
         state: statePda,
         authority: admin.publicKey,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -552,6 +559,7 @@ describe("de-fi functional tests", () => {
         poolTokenA: poolTokenAAccountPda,
         poolTokenB: poolTokenBAccountPda,
         lpTokenMint: lpTokenMintPda,
+        lpLockAccount: lpLockAccountPda,
         state: statePda,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -564,6 +572,25 @@ describe("de-fi functional tests", () => {
     const sqrtProduct = integerSqrt(BigInt(amountA.toString()) * BigInt(amountB.toString()));
     const expectedLp = sqrtProduct - 1000n;
     expect(userLpBal.value.amount).to.equal(expectedLp.toString());
+  });
+
+  it("Permanently locks minimum liquidity LP tokens out of the provider's balance", async () => {
+    console.log("--- Minimum Liquidity Lock Test ---");
+
+    // The lock account (PDA-owned, no withdraw path) must hold MINIMUM_LIQUIDITY.
+    const lockBal = await connection.getTokenAccountBalance(lpLockAccountPda);
+    expect(lockBal.value.amount).to.equal("1000");
+
+    // The LP mint total supply must be the full sqrt(k), NOT sqrt(k) - 1000.
+    const mintInfo = await program.provider.connection.getAccountInfo(lpTokenMintPda);
+    expect(mintInfo, "LP mint should exist").to.not.be.null;
+    const supply = new DataView(mintInfo!.data.buffer, mintInfo!.data.byteOffset + 36, 8).getBigUint64(0, true);
+    const sqrtProduct = integerSqrt(BigInt(10_000_000_000) * BigInt(10_000_000_000));
+    expect(supply.toString()).to.equal(sqrtProduct.toString());
+
+    // The lock account is owned by the pool PDA, not the user, and there is no
+    // instruction that can move these tokens out.
+    expect(lockBal.value.uiAmount).to.equal(0.000001); // 1000 raw tokens, 9 decimals
   });
 
   it("Swaps token A for token B successfully", async () => {
@@ -662,6 +689,23 @@ describe("de-fi functional tests", () => {
       .accountsPartial({ state: statePda, admin: signer3.publicKey })
       .signers([signer3])
       .rpc();
+
+    // Pause is timelocked: the delay (2s) must elapse after proposal before
+    // execution is allowed.
+    try {
+      await program.methods
+        .pause()
+        .accountsPartial({ state: statePda, admin: signer1.publicKey })
+        .signers([signer1])
+        .rpc();
+      expect.fail("Pause should fail before timelock expires");
+    } catch (error: any) {
+      const code = extractErrorCode(error).toLowerCase();
+      expect(code).to.equal("timelocknotexpired");
+      console.log("Timelock blocked early pause as expected.");
+    }
+
+    await waitMs(2200);
 
     await program.methods
       .pause()

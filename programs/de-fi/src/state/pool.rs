@@ -74,12 +74,15 @@ impl TokenKind {
     }
 
     pub fn normalize_amount(self, amount: u64) -> Result<u128> {
-        match self {
-            Self::Sol => Ok(amount as u128),
-            Self::Usdc => (amount as u128)
-                .checked_mul(10u128.pow(super::NORMALIZED_DECIMALS - 6))
-                .ok_or(ErrorCode::Overflow.into()),
-        }
+        // SOL (9 decimals) and USDC (6 decimals) are normalized to a common
+        // "base unit" where 1 lamport (1e-9 SOL) == 1 micro-USDC (1e-6 USDC).
+        //
+        // This follows the documented economic equivalence:
+        //   MIN_STAKE_AMOUNT = 1_000_000_000 == 1 SOL == 1,000 USDC
+        // i.e. 1e9 raw units represent both 1 SOL (9 decimals) and 1,000 USDC
+        // (6 decimals). Because both are expressed in the same raw magnitude,
+        // NO decimal rescaling is required.
+        Ok(amount as u128)
     }
 }
 
@@ -132,6 +135,7 @@ pub struct Pool {
     pub token_a_account: Pubkey,
     pub token_b_account: Pubkey,
     pub lp_token_mint: Pubkey,
+    pub lp_lock_account: Pubkey,
     pub fee_basis_points: u16,
     pub k_last: u128,
     pub flash_loan_fee_basis_points: u16,

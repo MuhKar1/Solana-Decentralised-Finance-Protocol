@@ -55,3 +55,11 @@ export function getPoolLpMintPda(pool: PublicKey): [PublicKey, number] {
     PROGRAM_ID
   );
 }
+
+/** LP minimum-liquidity lock account PDA (permanently locked LP tokens) */
+export function getPoolLpLockAccountPda(pool: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("lp_lock_account"), pool.toBuffer()],
+    PROGRAM_ID
+  );
+}

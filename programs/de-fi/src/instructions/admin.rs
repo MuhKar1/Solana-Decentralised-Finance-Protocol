@@ -3,8 +3,8 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::errors::ErrorCode;
 use crate::state::{
-    update_global_rewards, ActionType, PendingAction, ProgramState, MAX_REWARD_RATE,
-    MAX_TIMELOCK_DELAY, MIN_STAKE_AMOUNT, PRECISION,
+    update_global_rewards, validate_multisig_signers, ActionType, PendingAction, ProgramState,
+    MAX_REWARD_RATE, MAX_TIMELOCK_DELAY, MIN_STAKE_AMOUNT, PRECISION,
 };
 
 #[derive(Accounts)]
@@ -216,6 +216,10 @@ pub fn initialize_state(
         ErrorCode::InvalidAmount
     );
 
+    // Reject the default (zero) pubkey as a signer and enforce that all three
+    // configured signers are unique (shared, unit-tested validation).
+    validate_multisig_signers(signer1, signer2, signer3)?;
+
     let state = &mut ctx.accounts.state;
     state.authority = ctx.accounts.authority.key();
     state.signer1 = signer1;
@@ -305,6 +309,15 @@ pub fn pause(ctx: Context<Pause>) -> Result<()> {
             approval_count >= state.required_signatures as usize,
             ErrorCode::InsufficientSignatures
         );
+
+        // Pause is intentionally timelocked just like every other sensitive
+        // governance action. It requires 3-of-3 signer approval AND the
+        // timelock delay to elapse, matching the documented security model.
+        require!(
+            Clock::get()?.unix_timestamp >= pending.proposed_at + state.timelock_delay,
+            ErrorCode::TimelockNotExpired
+        );
+
         state.paused = true;
         state.pending_action = None;
     } else {

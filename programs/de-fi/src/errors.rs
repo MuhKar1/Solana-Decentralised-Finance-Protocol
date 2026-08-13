@@ -58,4 +58,8 @@ pub enum ErrorCode {
     InvalidCallbackProgram,
     #[msg("Flash loan callback program is not approved")]
     UnapprovedCallbackProgram,
+    #[msg("Invalid multisig signer (zero pubkey is not a valid signer)")]
+    InvalidMultisigSigner,
+    #[msg("Duplicate multisig signer detected; all signers must be unique")]
+    DuplicateSigner,
 }

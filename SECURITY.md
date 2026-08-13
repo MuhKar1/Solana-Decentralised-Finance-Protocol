@@ -110,9 +110,10 @@ The protocol uses a **3-of-3 multi-sig** with **timelock enforcement**:
                     └────────────┬─────────────┘
                                  │
                     ┌────────────▼────────────┐
-                    │  TIMELOCK CHECK (24h)    │
+                    │  TIMELOCK CHECK          │
                     │  Clock::get() >=          │
                     │  proposed_at + delay      │
+                    │  (delay is configurable)  │
                     └────────────┬─────────────┘
                                  │
                     ┌────────────▼────────────┐
@@ -124,7 +125,7 @@ The protocol uses a **3-of-3 multi-sig** with **timelock enforcement**:
 ### Why 3-of-3 with Timelock?
 
 - **3-of-3** eliminates single points of failure — one compromised key cannot act alone
-- **Timelock (24h default)** creates a window for detection and response to malicious proposals
+- **Timelock** creates a window for detection and response to malicious proposals. The delay is **configurable at initialization** (`timelock_delay`, bounded by `MAX_TIMELOCK_DELAY`); there is no hardcoded default in the program — the frontend merely pre-fills its input with `86400` (24h).
 - The number 3 is the minimum viable multi-sig while being practical for coordination
 - Some protocols use 2-of-3 or M-of-N, but 3-of-3 provides the strongest security for admin operations since none of these operations need to be fast
 
@@ -138,14 +139,19 @@ Once set at `initialize_state`, the 3 signer public keys **cannot be changed**. 
 
 ### Pause Control
 
-The protocol has a **pause/unpause** mechanism governed by multi-sig:
+The protocol has a **pause/unpause** mechanism governed by multi-sig. Both `pause` and `unpause` require 3-of-3 signer approval **and** the timelock delay to elapse (keyed off the proposal's `proposed_at` timestamp, not the final approval).
 
 | State | What's Blocked | What's Allowed |
 |---|---|---|
-| **PAUSED** | stake, unstake, swap, add_liquidity, remove_liquidity | emergency_unstake, emergency_remove_liquidity, admin operations, claim_rewards |
-| **ACTIVE** | emergency withdrawal paths | All operations |
+| **PAUSED** | `stake`, `unstake`, `claim_rewards`, `swap`, `add_liquidity`, `remove_liquidity`, `create_pool`, `flash_loan`, `fund_reward_vault` | `emergency_unstake`, `emergency_remove_liquidity`, `update_rewards`, `close_stake_account`, and all admin/governance instructions |
+| **ACTIVE** | `emergency_unstake`, `emergency_remove_liquidity` (they require paused state) | All operations |
 
-**Rationale:** Pause is a circuit-breaker. When activated, users retain full ability to withdraw their funds — only new deposits and trades are halted. This prevents "rug pull via pause" attacks where admins lock user funds.
+**Rationale:** Pause is a circuit-breaker. While paused:
+
+- Users can withdraw their **principal** — `emergency_unstake` returns 100% of staked tokens and `emergency_remove_liquidity` returns a proportional share of pool reserves.
+- Users **cannot** claim accrued rewards: `claim_rewards` is gated by `!paused`, so pending rewards are unclaimable until `unpause`.
+- Reward accrual is lazy — the global accumulator is recomputed on the next permitted call and accounts for all elapsed time — but the rewards remain unclaimable during pause.
+- `emergency_unstake` forfeits the accrued `pending_rewards` (sets them to zero) in exchange for immediate principal withdrawal.
 
 ---
 
@@ -188,6 +194,26 @@ assert(k_after >= k_last)
 | **Proportionality abuse** | ±0.1% tolerance on liquidity additions |
 | **Pool key collision** | `token_a < token_b` enforced deterministically |
 
+### Reward Decimal Normalisation
+
+SOL (9 decimals) and USDC (6 decimals) are normalised to a common **raw base unit**:
+
+```
+1 raw base unit == 1 lamport (1e-9 SOL) == 1 micro-USDC (1e-6 USDC)
+MIN_STAKE_AMOUNT = 1_000_000_000 == 1 SOL == 1,000 USDC
+```
+
+Because both tokens are already expressed in the same raw magnitude under the
+protocol's documented economic equivalence, `total_staked_sol` and
+`total_staked_usdc` are summed directly in the reward accumulator. **No decimal
+rescaling is applied** — USDC is not multiplied by `10^(9-6)`. This ensures:
+
+- SOL and USDC stakes are weighted equally per unit of economic value.
+- `reward_per_token` is denominated in the shared base-unit accumulated over time.
+- `pending_rewards` is denominated in the each vault token's **native** decimals
+  (9 for SOL, 6 for USDC), so the final claim amount is transferred as-is without
+  any conversion.
+
 ### Flash Loan Security
 
 ```
@@ -196,6 +222,30 @@ Callback program must be approved via governance
 Callback deadline: 60 seconds
 Post-loan invariant must cover fee
 ```
+
+**Flash-loan trust model:**
+
+| Party | Trusted? | Rationale |
+|---|---|---|
+| Governance signers (3-of-3 + timelock) | Trusted | Can update the allowlisted callback program |
+| The allowlisted callback program | **Partially trusted** — it executes arbitrary logic during the callback, but cannot keep protocol state inconsistent because the protocol re-checks the AMM invariant after the callback returns |
+| The borrower (signer) | Not trusted | Only chooses `amount` and the callback program id (which must equal the allowlist); cannot bypass repayment |
+| Token program / system program | Trusted (via Anchor CPI) | Standard SPL token semantics |
+
+**What the allowlisted callback program is permitted to do:**
+
+- Receive the borrowed tokens and a borrower-designated token account.
+- Perform arbitrary CPI logic during the same transaction (e.g. arbitrage).
+- Must leave the pool's `reserve_a × reserve_b` invariant at or above
+  `invariant_before + fee × other_reserve` by the time it returns.
+
+**What it is not permitted to do:**
+
+- Change protocol state (pause, reward rate, pool config, signers).
+- Bypass repayment — the invariant check is enforced **after** the callback CPI
+  returns, with the pool vaults reloaded from chain.
+- Exceed the 50%-of-reserve borrow limit or the 60-second deadline.
+- Be invoked with an incorrect program id (must equal `flash_loan_callback_program`).
 
 ---
 

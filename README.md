@@ -5,7 +5,7 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15+-black?logo=next.js)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 
-A production-grade, fullstack decentralised finance protocol on Solana featuring **multi-signature governance**, **dual-token yield staking** (SOL & USDC), an **automated market maker** with flash loan support, and **emergency pause mechanisms** — all accessible through a modern React/Next.js frontend.
+A **production-oriented** fullstack decentralised finance protocol on Solana featuring **multi-signature governance**, **dual-token yield staking** (SOL & USDC), an **automated market maker** with flash loan support, and **emergency pause mechanisms** — all accessible through a modern React/Next.js frontend.
 
 Program ID (Devnet): `FDwF1iC4FYJrAMK9ns7pSUjZdhaZRjQ857bsaQEyZ7B1`
 
@@ -40,7 +40,7 @@ The DeFi Protocol is a complete on-chain financial application built on Solana u
 - **Separation of concerns** — Instruction modules are decoupled by domain (admin, staking, liquidity)
 - **Defence in depth** — Multiple layers of security: multisig, timelocks, pause controls, arithmetic guards
 - **User safety** — Emergency withdrawal paths, slippage protection, invariant enforcement
-- **Fullstack transparency** — All 23 on-chain functions exposed through a self-documenting UI with real-time state display
+- **Fullstack transparency** — All 23 on-chain functions exposed through a self-documenting UI with real-time state display (30 custom error codes)
 
 ---
 
@@ -74,7 +74,7 @@ The DeFi Protocol is a complete on-chain financial application built on Solana u
 │  ┌──────────────────────────────────────────────────┐   │
 │  │  state/pool.rs — ProgramState, Pool, UserStake   │   │
 │  │  state/mod.rs  — Rewards math, constants         │   │
-│  │  errors.rs     — 28 custom error codes           │   │
+│  │  errors.rs     — 30 custom error codes           │   │
 │  │  events.rs     — Event emission for indexing     │   │
 │  └──────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────┤
@@ -121,10 +121,10 @@ The protocol uses a **3-of-3 multi-signature scheme** with timelock enforcement 
 | Update flash loan callback | 3/3 signers, proposal + approvals | Yes |
 
 **Proposal lifecycle:**
-1. **Propose** — Any of the 3 signers initiates a proposal with encoded action data
-2. **Approve** — The remaining signers approve; each approval is tracked in a `[bool; 3]` bitmap
-3. **Execute** — Once all 3 have approved **and** the timelock delay has elapsed, the action executes
-4. **Cancel** — Any signer can cancel a pending proposal before execution
+1. **Propose** — Any of the 3 signers initiates a proposal with encoded action data. The proposal's creation timestamp (`proposed_at`) is recorded here.
+2. **Approve** — The remaining signers approve; each approval is tracked in a `[bool; 3]` bitmap.
+3. **Execute** — The action executes only when **both** conditions hold: (a) all 3 signers have approved, **and** (b) `now >= proposed_at + timelock_delay`. The timelock countdown starts at **proposal creation time**, not at the final approval. If the signers take longer than the delay to reach 3/3, the action becomes executable immediately upon the final approval; otherwise there is a residual wait until the delay elapses.
+4. **Cancel** — Any signer can cancel a pending proposal before execution.
 
 **Admin-only initialisation:**
 - `initialize_state` — Sets authority, 3 signer pubkeys, timelock delay, reward rate, protocol fee
@@ -155,8 +155,12 @@ Dual-token staking with independent SOL and USDC pools. Each operates identicall
 **Token-type normalisation:**
 ```rust
 MIN_STAKE_AMOUNT = 1_000_000_000  // 1 SOL (9 decimals) or 1,000 USDC (6 decimals)
-NORMALIZED_DECIMALS = 9            // USDC amounts scaled up for unified reward math
 ```
+
+Both tokens share the same economic equivalence (`1e9` raw units == 1 SOL == 1,000 USDC),
+so SOL and USDC stake amounts are already comparable in their raw "base unit" and are
+summed directly for reward accounting. USDC rewards are issued in USDC's native 6-decimal
+precision on claim — no decimal rescaling is applied in the accumulator.
 
 ### 3. AMM & Liquidity Pool
 
@@ -174,7 +178,9 @@ A constant-product market maker (x·y = k) between SOL and USDC.
 
 **Key AMM rules:**
 - Token pair ordering enforced (`token_a < token_b`) for deterministic PDA derivation
-- Initial liquidity provision mints `sqrt(x·y) - MINIMUM_LIQUIDITY` LP tokens
+- Initial liquidity provision mints `sqrt(x·y)` LP tokens total: `MINIMUM_LIQUIDITY` (1,000) are
+  minted to a PDA-owned lock account that can never be withdrawn, and `sqrt(x·y) - MINIMUM_LIQUIDITY`
+  are minted to the provider
 - Subsequent additions must maintain the pool ratio (proportionality tolerance ±0.1%)
 - Swap size capped at 10% of reserve side to prevent extreme slippage
 - Post-swap invariant must be ≥ pre-swap k_last value
@@ -204,12 +210,15 @@ Permissioned flash loans with a callback-program allowlist model.
 
 ### 5. Emergency Mechanisms
 
+Both `pause` and `unpause` require 3-of-3 signer approval **and** the timelock
+delay to elapse (measured from the proposal's `proposed_at` timestamp).
+
 | Mechanism | Trigger | Effect |
 |---|---|---|
-| `pause` | 3/3 governance approval | Stops all user-facing operations (stake, unstake, swap, liquidity) |
+| `pause` | 3/3 governance approval + timelock | Stops `stake`, `unstake`, `claim_rewards`, `swap`, `add_liquidity`, `remove_liquidity`, `create_pool`, `flash_loan`, and `fund_reward_vault` |
 | `unpause` | 3/3 governance approval + timelock | Resumes normal operations |
-| `emergency_unstake` | Protocol paused | Users withdraw 100% of staked tokens |
-| `emergency_remove_liquidity` | Protocol paused | LPs withdraw proportional share of pool reserves |
+| `emergency_unstake` | Protocol paused | Users withdraw 100% of staked principal, forfeiting accrued `pending_rewards` |
+| `emergency_remove_liquidity` | Protocol paused | LPs withdraw a proportional share of pool reserves |
 
 ---
 
@@ -252,7 +261,7 @@ Layer 5: Frontend
   └── Comprehensive error parsing with friendly messages
 ```
 
-### Custom Error Codes (28 total)
+### Custom Error Codes (30 total)
 
 | Range | Category |
 |---|---|
@@ -264,13 +273,14 @@ Layer 5: Frontend
 | 6016–6018 | Swap/Token (ExcessiveSwapAmount, InvalidFeeAmount, InvalidMint) |
 | 6019–6023 | Governance (InsufficientSignatures, InvalidAction, TimelockNotExpired, InvalidTokenType, ProposalAlreadyActive) |
 | 6024–6027 | Flash Loans (FlashLoanNotRepaid, FlashLoanTooLarge, InvalidCallbackProgram, UnapprovedCallbackProgram) |
+| 6028–6029 | Multisig signers (InvalidMultisigSigner, DuplicateSigner) |
 
 ### What's Protected
 
 | Attack Vector | Mitigation |
 |---|---|
 | Unauthorised admin actions | `has_one = authority` + multisig approval bitmap |
-| Front-running governance | Timelock delay (configurable, default 24h) |
+| Front-running governance | Timelock delay (set at initialization, bounded by `MAX_TIMELOCK_DELAY`) |
 | Flash loan manipulation | Max 50% reserve + invariant check + approved callbacks only |
 | Slippage exploitation | User-set minimum output amounts rejected on-chain |
 | Dust staking attacks | Minimum stake threshold (1 SOL / 1,000 USDC) |
@@ -308,7 +318,7 @@ Wallet Connect → My Portfolio (auto-populates) → Choose Operation Tab
 | **Pool data from chain** | Swap fee, flash loan fee, liquidity, callback program — all read live |
 | **Protocol state dashboard** | 19 on-chain parameters displayed in real-time (admin) |
 | **Emergency UI** | Emergency unstake/remove buttons visible during pause state |
-| **Error parsing** | 28 custom error codes mapped to plain-English messages + on-chain log extraction |
+| **Error parsing** | 30 custom error codes mapped to plain-English messages + on-chain log extraction |
 | **Advanced mode** | Flash loan section collapsed behind developer toggle |
 | **Idempotent initialisation** | USDC mint recovered from on-chain if localStorage is cleared |
 
@@ -328,7 +338,7 @@ de-fi/
 │   ├── state/
 │   │   ├── mod.rs               # Constants, reward math
 │   │   └── pool.rs              # ProgramState, Pool, UserStake structs
-│   ├── errors.rs                # 28 custom error codes
+│   ├── errors.rs                # 30 custom error codes
 │   └── events.rs                # Event emission types
 ├── app/                         # Next.js 15 frontend
 │   ├── src/

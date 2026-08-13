@@ -77,6 +77,10 @@
           "writable": true
         },
         {
+          "name": "lp_lock_account",
+          "writable": true
+        },
+        {
           "name": "state",
           "writable": true,
           "pda": {
@@ -466,6 +470,38 @@
                   95,
                   109,
                   105,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "lp_lock_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  112,
+                  95,
+                  108,
+                  111,
+                  99,
+                  107,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
                   110,
                   116
                 ]
@@ -2083,6 +2119,16 @@
       "code": 6027,
       "name": "UnapprovedCallbackProgram",
       "msg": "Flash loan callback program is not approved"
+    },
+    {
+      "code": 6028,
+      "name": "InvalidMultisigSigner",
+      "msg": "Invalid multisig signer (zero pubkey is not a valid signer)"
+    },
+    {
+      "code": 6029,
+      "name": "DuplicateSigner",
+      "msg": "Duplicate multisig signer detected; all signers must be unique"
     }
   ],
   "types": [
@@ -2250,6 +2296,10 @@
           },
           {
             "name": "lp_token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "lp_lock_account",
             "type": "pubkey"
           },
           {
