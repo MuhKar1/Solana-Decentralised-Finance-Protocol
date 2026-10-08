@@ -8,11 +8,17 @@ import { BN } from "@coral-xyz/anchor";
 import {
   getStatePda,
   getPoolPda,
+  sortMintPair,
   getPoolTokenPda,
   getPoolLpMintPda,
   getPoolLpLockAccountPda,
 } from "@/lib/pda";
 import { ensureAta, wrapSolIfNeeded } from "@/lib/token-helpers";
+import {
+  PYTH_SOL_FEED_PUBKEY,
+  PYTH_USDC_FEED_PUBKEY,
+  feedForMint,
+} from "@/lib/oracle";
 
 export function useSwap(program: any, provider: any, usdcMint: PublicKey) {
   const { publicKey: pk } = useWallet();
@@ -20,12 +26,13 @@ export function useSwap(program: any, provider: any, usdcMint: PublicKey) {
     async (amountIn: BN, minAmountOut: BN): Promise<string> => {
       if (!program || !provider || !pk) throw new Error("Wallet not connected");
       const wsol = new PublicKey("So11111111111111111111111111111111111111112");
+      const [tokenA, tokenB] = sortMintPair(wsol, usdcMint);
       const userInAta = await ensureAta(provider, pk, wsol);
       await wrapSolIfNeeded(provider, pk, userInAta, amountIn.toNumber());
       const userOutAta = await ensureAta(provider, pk, usdcMint);
 
       const [sp] = getStatePda();
-      const [poolPda] = getPoolPda(wsol, usdcMint);
+      const [poolPda] = getPoolPda(tokenA, tokenB);
       const [poolTokenA] = getPoolTokenPda(poolPda, "token_a");
       const [poolTokenB] = getPoolTokenPda(poolPda, "token_b");
 
@@ -42,6 +49,8 @@ export function useSwap(program: any, provider: any, usdcMint: PublicKey) {
           tokenOut: usdcMint,
           state: sp,
           tokenProgram: TOKEN_PROGRAM_ID,
+          pythPriceA: PYTH_SOL_FEED_PUBKEY,
+          pythPriceB: PYTH_USDC_FEED_PUBKEY,
         })
         .rpc();
     },
@@ -49,18 +58,28 @@ export function useSwap(program: any, provider: any, usdcMint: PublicKey) {
   );
 }
 
-export function useAddLiquidity(program: any, provider: any, usdcMint: PublicKey) {
+export function useAddLiquidity(
+  program: any,
+  provider: any,
+  usdcMint: PublicKey
+) {
   const { publicKey: pk } = useWallet();
   return useCallback(
     async (amountA: BN, amountB: BN, minLp: BN): Promise<string> => {
       if (!program || !provider || !pk) throw new Error("Wallet not connected");
       const wsol = new PublicKey("So11111111111111111111111111111111111111112");
-      const userAtaA = await ensureAta(provider, pk, wsol);
-      await wrapSolIfNeeded(provider, pk, userAtaA, amountA.toNumber());
-      const userAtaB = await ensureAta(provider, pk, usdcMint);
+      const [tokenA, tokenB] = sortMintPair(wsol, usdcMint);
+      const userSolAta = await ensureAta(provider, pk, wsol);
+      await wrapSolIfNeeded(provider, pk, userSolAta, amountA.toNumber());
+      const userUsdcAta = await ensureAta(provider, pk, usdcMint);
+      const wsolIsTokenA = tokenA.equals(wsol);
+      const userAtaA = wsolIsTokenA ? userSolAta : userUsdcAta;
+      const userAtaB = wsolIsTokenA ? userUsdcAta : userSolAta;
+      const programAmountA = wsolIsTokenA ? amountA : amountB;
+      const programAmountB = wsolIsTokenA ? amountB : amountA;
 
       const [sp] = getStatePda();
-      const [poolPda] = getPoolPda(wsol, usdcMint);
+      const [poolPda] = getPoolPda(tokenA, tokenB);
       const [poolTokenA] = getPoolTokenPda(poolPda, "token_a");
       const [poolTokenB] = getPoolTokenPda(poolPda, "token_b");
       const [lpMint] = getPoolLpMintPda(poolPda);
@@ -68,7 +87,7 @@ export function useAddLiquidity(program: any, provider: any, usdcMint: PublicKey
       const userLpAta = await ensureAta(provider, pk, lpMint);
 
       return program.methods
-        .addLiquidity(amountA, amountB, minLp)
+        .addLiquidity(programAmountA, programAmountB, minLp)
         .accounts({
           user: pk,
           userTokenA: userAtaA,
@@ -100,18 +119,24 @@ export function useRemoveLiquidity(
     async (lpAmount: BN, minA: BN, minB: BN): Promise<string> => {
       if (!program || !provider || !pk) throw new Error("Wallet not connected");
       const wsol = new PublicKey("So11111111111111111111111111111111111111112");
-      const userAtaA = await ensureAta(provider, pk, wsol);
-      const userAtaB = await ensureAta(provider, pk, usdcMint);
+      const [tokenA, tokenB] = sortMintPair(wsol, usdcMint);
+      const userSolAta = await ensureAta(provider, pk, wsol);
+      const userUsdcAta = await ensureAta(provider, pk, usdcMint);
+      const wsolIsTokenA = tokenA.equals(wsol);
+      const userAtaA = wsolIsTokenA ? userSolAta : userUsdcAta;
+      const userAtaB = wsolIsTokenA ? userUsdcAta : userSolAta;
+      const programMinA = wsolIsTokenA ? minA : minB;
+      const programMinB = wsolIsTokenA ? minB : minA;
 
       const [sp] = getStatePda();
-      const [poolPda] = getPoolPda(wsol, usdcMint);
+      const [poolPda] = getPoolPda(tokenA, tokenB);
       const [poolTokenA] = getPoolTokenPda(poolPda, "token_a");
       const [poolTokenB] = getPoolTokenPda(poolPda, "token_b");
       const [lpMint] = getPoolLpMintPda(poolPda);
       const userLpAta = await ensureAta(provider, pk, lpMint);
 
       return program.methods
-        .removeLiquidity(lpAmount, minA, minB)
+        .removeLiquidity(lpAmount, programMinA, programMinB)
         .accounts({
           user: pk,
           userTokenA: userAtaA,
@@ -130,24 +155,37 @@ export function useRemoveLiquidity(
   );
 }
 
-export function useCreatePool(program: any, provider: any, usdcMint: PublicKey) {
+export function useCreatePool(
+  program: any,
+  provider: any,
+  usdcMint: PublicKey
+) {
   const { publicKey: pk } = useWallet();
   return useCallback(
-    async (feeBasisPoints: number): Promise<string> => {
+    async (
+      feeBasisPoints: number,
+      pythFeedA: PublicKey = PYTH_SOL_FEED_PUBKEY,
+      pythFeedB: PublicKey = PYTH_USDC_FEED_PUBKEY
+    ): Promise<string> => {
       if (!program || !provider || !pk) throw new Error("Wallet not connected");
       const wsol = new PublicKey("So11111111111111111111111111111111111111112");
+      const [tokenA, tokenB] = sortMintPair(wsol, usdcMint);
       const [sp] = getStatePda();
-      const [poolPda] = getPoolPda(wsol, usdcMint);
+      const [poolPda] = getPoolPda(tokenA, tokenB);
       const [tokenAAccount] = getPoolTokenPda(poolPda, "token_a");
       const [tokenBAccount] = getPoolTokenPda(poolPda, "token_b");
       const [lpMint] = getPoolLpMintPda(poolPda);
       const [lpLockAccount] = getPoolLpLockAccountPda(poolPda);
       return program.methods
-        .createPool(feeBasisPoints)
+        .createPool(
+          feeBasisPoints,
+          feedForMint(tokenA, usdcMint, pythFeedA, pythFeedB),
+          feedForMint(tokenB, usdcMint, pythFeedA, pythFeedB)
+        )
         .accounts({
           pool: poolPda,
-          tokenAMint: wsol,
-          tokenBMint: usdcMint,
+          tokenAMint: tokenA,
+          tokenBMint: tokenB,
           tokenAAccount,
           tokenBAccount,
           lpTokenMint: lpMint,

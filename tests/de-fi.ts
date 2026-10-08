@@ -128,27 +128,19 @@ describe("de-fi functional tests", () => {
       console.log("Funding signer3...");
       await transferSol(admin, signer3.publicKey, amountToFund);
       console.log("Funding user...");
-      await transferSol(admin, user.publicKey, 10 * anchor.web3.LAMPORTS_PER_SOL);
+      await transferSol(
+        admin,
+        user.publicKey,
+        10 * anchor.web3.LAMPORTS_PER_SOL
+      );
 
       console.log("Creating solMint...");
       // Create Mints
-      solMint = await createMint(
-        connection,
-        admin,
-        admin.publicKey,
-        null,
-        9
-      );
+      solMint = await createMint(connection, admin, admin.publicKey, null, 9);
       console.log("solMint created:", solMint.toBase58());
 
       console.log("Creating usdcMint...");
-      usdcMint = await createMint(
-        connection,
-        admin,
-        admin.publicKey,
-        null,
-        6
-      );
+      usdcMint = await createMint(connection, admin, admin.publicKey, null, 6);
       console.log("usdcMint created:", usdcMint.toBase58());
 
       // Calculate PDAs
@@ -188,12 +180,20 @@ describe("de-fi functional tests", () => {
       )[0];
 
       userStakeSolPda = anchor.web3.PublicKey.findProgramAddressSync(
-        [Buffer.from("user_stake"), user.publicKey.toBuffer(), Buffer.from([0])],
+        [
+          Buffer.from("user_stake"),
+          user.publicKey.toBuffer(),
+          Buffer.from([0]),
+        ],
         program.programId
       )[0];
 
       userStakeUsdcPda = anchor.web3.PublicKey.findProgramAddressSync(
-        [Buffer.from("user_stake"), user.publicKey.toBuffer(), Buffer.from([1])],
+        [
+          Buffer.from("user_stake"),
+          user.publicKey.toBuffer(),
+          Buffer.from([1]),
+        ],
         program.programId
       )[0];
 
@@ -250,7 +250,10 @@ describe("de-fi functional tests", () => {
       console.log("rewardVaultSolPda:", rewardVaultSolPda.toBase58());
       console.log("rewardVaultUsdcPda:", rewardVaultUsdcPda.toBase58());
       console.log("protocolTreasurySolPda:", protocolTreasurySolPda.toBase58());
-      console.log("protocolTreasuryUsdcPda:", protocolTreasuryUsdcPda.toBase58());
+      console.log(
+        "protocolTreasuryUsdcPda:",
+        protocolTreasuryUsdcPda.toBase58()
+      );
     } catch (e) {
       console.error("CRITICAL ERROR IN BEFORE HOOK:", e);
       throw e;
@@ -290,10 +293,7 @@ describe("de-fi functional tests", () => {
       program.programId
     )[0];
 
-    userLpAta = getAssociatedTokenAddressSync(
-      lpTokenMintPda,
-      user.publicKey
-    );
+    userLpAta = getAssociatedTokenAddressSync(lpTokenMintPda, user.publicKey);
   });
 
   it("Initializes state correctly", async () => {
@@ -373,7 +373,14 @@ describe("de-fi functional tests", () => {
     const fundAmount = new anchor.BN(100_000_000_000); // 100 tokens
 
     // Mint SOL-tokens to admin and fund SOL reward vault
-    await mintTo(connection, admin, solMint, adminSolAta, admin.publicKey, fundAmount.toNumber());
+    await mintTo(
+      connection,
+      admin,
+      solMint,
+      adminSolAta,
+      admin.publicKey,
+      fundAmount.toNumber()
+    );
     await program.methods
       .fundRewardVault(fundAmount, 0)
       .accountsPartial({
@@ -388,7 +395,14 @@ describe("de-fi functional tests", () => {
       .rpc();
 
     // Mint USDC-tokens to admin and fund USDC reward vault
-    await mintTo(connection, admin, usdcMint, adminUsdcAta, admin.publicKey, 100_000_000); // 100 USDC (6 decimals)
+    await mintTo(
+      connection,
+      admin,
+      usdcMint,
+      adminUsdcAta,
+      admin.publicKey,
+      100_000_000
+    ); // 100 USDC (6 decimals)
     await program.methods
       .fundRewardVault(new anchor.BN(100_000_000), 1)
       .accountsPartial({
@@ -403,7 +417,9 @@ describe("de-fi functional tests", () => {
       .rpc();
 
     const solVault = await connection.getTokenAccountBalance(rewardVaultSolPda);
-    const usdcVault = await connection.getTokenAccountBalance(rewardVaultUsdcPda);
+    const usdcVault = await connection.getTokenAccountBalance(
+      rewardVaultUsdcPda
+    );
     expect(solVault.value.amount).to.equal("100000000000");
     expect(usdcVault.value.amount).to.equal("100000000");
   });
@@ -413,7 +429,14 @@ describe("de-fi functional tests", () => {
     const stakeAmount = new anchor.BN(2_000_000_000); // 2 SOL (above min stake of 1 SOL)
 
     // Mint SOL to user
-    await mintTo(connection, admin, solMint, userSolAta, admin.publicKey, stakeAmount.toNumber());
+    await mintTo(
+      connection,
+      admin,
+      solMint,
+      userSolAta,
+      admin.publicKey,
+      stakeAmount.toNumber()
+    );
 
     await program.methods
       .stake(stakeAmount, 0)
@@ -429,8 +452,13 @@ describe("de-fi functional tests", () => {
       .signers([user])
       .rpc();
 
-    const userStakeState = await program.account.userStake.fetch(userStakeSolPda);
-    console.log("User stake after deposit:", userStakeState.stakedAmount.toString());
+    const userStakeState = await program.account.userStake.fetch(
+      userStakeSolPda
+    );
+    console.log(
+      "User stake after deposit:",
+      userStakeState.stakedAmount.toString()
+    );
     expect(userStakeState.stakedAmount.toString()).to.equal("2000000000");
     expect(userStakeState.tokenType).to.equal(0);
   });
@@ -451,7 +479,9 @@ describe("de-fi functional tests", () => {
       .signers([user])
       .rpc();
 
-    const userStakeState = await program.account.userStake.fetch(userStakeSolPda);
+    const userStakeState = await program.account.userStake.fetch(
+      userStakeSolPda
+    );
     expect(userStakeState.stakedAmount.toString()).to.equal("1000000000");
   });
 
@@ -490,7 +520,9 @@ describe("de-fi functional tests", () => {
       .signers([user])
       .rpc();
 
-    const userStakeState = await program.account.userStake.fetch(userStakeSolPda);
+    const userStakeState = await program.account.userStake.fetch(
+      userStakeSolPda
+    );
     expect(userStakeState.pendingRewards.toNumber()).to.equal(0);
   });
 
@@ -537,8 +569,22 @@ describe("de-fi functional tests", () => {
     }
 
     // Mint enough pool tokens to user
-    await mintTo(connection, admin, tokenA, userAtaA, admin.publicKey, amountA.toNumber());
-    await mintTo(connection, admin, tokenB, userAtaB, admin.publicKey, amountB.toNumber());
+    await mintTo(
+      connection,
+      admin,
+      tokenA,
+      userAtaA,
+      admin.publicKey,
+      amountA.toNumber()
+    );
+    await mintTo(
+      connection,
+      admin,
+      tokenB,
+      userAtaB,
+      admin.publicKey,
+      amountB.toNumber()
+    );
 
     // Create the associated token account for the LP token now that the LP token mint exists
     await getOrCreateAssociatedTokenAccount(
@@ -569,7 +615,9 @@ describe("de-fi functional tests", () => {
       .rpc();
 
     const userLpBal = await connection.getTokenAccountBalance(userLpAta);
-    const sqrtProduct = integerSqrt(BigInt(amountA.toString()) * BigInt(amountB.toString()));
+    const sqrtProduct = integerSqrt(
+      BigInt(amountA.toString()) * BigInt(amountB.toString())
+    );
     const expectedLp = sqrtProduct - 1000n;
     expect(userLpBal.value.amount).to.equal(expectedLp.toString());
   });
@@ -582,10 +630,18 @@ describe("de-fi functional tests", () => {
     expect(lockBal.value.amount).to.equal("1000");
 
     // The LP mint total supply must be the full sqrt(k), NOT sqrt(k) - 1000.
-    const mintInfo = await program.provider.connection.getAccountInfo(lpTokenMintPda);
+    const mintInfo = await program.provider.connection.getAccountInfo(
+      lpTokenMintPda
+    );
     expect(mintInfo, "LP mint should exist").to.not.be.null;
-    const supply = new DataView(mintInfo!.data.buffer, mintInfo!.data.byteOffset + 36, 8).getBigUint64(0, true);
-    const sqrtProduct = integerSqrt(BigInt(10_000_000_000) * BigInt(10_000_000_000));
+    const supply = new DataView(
+      mintInfo!.data.buffer,
+      mintInfo!.data.byteOffset + 36,
+      8
+    ).getBigUint64(0, true);
+    const sqrtProduct = integerSqrt(
+      BigInt(10_000_000_000) * BigInt(10_000_000_000)
+    );
     expect(supply.toString()).to.equal(sqrtProduct.toString());
 
     // The lock account is owned by the pool PDA, not the user, and there is no
@@ -607,10 +663,17 @@ describe("de-fi functional tests", () => {
     }
 
     // Amount to swap is less than 10% of pool reserves (which is 10,000,000,000 / 10 = 1,000,000,000)
-    const amountIn = new anchor.BN(200_000_000); 
+    const amountIn = new anchor.BN(200_000_000);
     const minAmountOut = new anchor.BN(100_000_000);
 
-    await mintTo(connection, admin, tokenA, userAtaA, admin.publicKey, amountIn.toNumber());
+    await mintTo(
+      connection,
+      admin,
+      tokenA,
+      userAtaA,
+      admin.publicKey,
+      amountIn.toNumber()
+    );
 
     const userUsdcBalBefore = await connection.getTokenAccountBalance(userAtaB);
 
@@ -650,9 +713,14 @@ describe("de-fi functional tests", () => {
       .signers([signer1])
       .rpc();
 
-    const stateAfterProposal = await program.account.programState.fetch(statePda);
+    const stateAfterProposal = await program.account.programState.fetch(
+      statePda
+    );
     expect(stateAfterProposal.pendingAction).to.not.be.null;
-    console.log("Pending action set:", stateAfterProposal.pendingAction !== null);
+    console.log(
+      "Pending action set:",
+      stateAfterProposal.pendingAction !== null
+    );
 
     console.log("Canceling pending action using signer2...");
     await program.methods
@@ -666,7 +734,10 @@ describe("de-fi functional tests", () => {
 
     const stateAfterCancel = await program.account.programState.fetch(statePda);
     expect(stateAfterCancel.pendingAction).to.be.null;
-    console.log("Pending action cleared:", stateAfterCancel.pendingAction === null);
+    console.log(
+      "Pending action cleared:",
+      stateAfterCancel.pendingAction === null
+    );
   });
 
   it("Executes multisig pause and unpause with timelock enforcement", async () => {
@@ -717,7 +788,14 @@ describe("de-fi functional tests", () => {
     expect(pausedState.paused).to.equal(true);
     console.log("Paused state after multisig execution:", pausedState.paused);
 
-    await mintTo(connection, admin, solMint, userSolAta, admin.publicKey, 1_000_000_000);
+    await mintTo(
+      connection,
+      admin,
+      solMint,
+      userSolAta,
+      admin.publicKey,
+      1_000_000_000
+    );
     try {
       await program.methods
         .stake(new anchor.BN(1_000_000_000), 0)
@@ -786,7 +864,11 @@ describe("de-fi functional tests", () => {
 
     await program.methods
       .updateRewards(0)
-      .accountsPartial({ user: user.publicKey, state: statePda, userStake: userStakeSolPda })
+      .accountsPartial({
+        user: user.publicKey,
+        state: statePda,
+        userStake: userStakeSolPda,
+      })
       .signers([user])
       .rpc();
 
@@ -822,7 +904,9 @@ describe("de-fi functional tests", () => {
         .rpc();
       expect.fail("Update reward rate should fail before timelock expires");
     } catch (error: any) {
-      expect(extractErrorCode(error).toLowerCase()).to.equal("timelocknotexpired");
+      expect(extractErrorCode(error).toLowerCase()).to.equal(
+        "timelocknotexpired"
+      );
     }
 
     await waitMs(2200);
@@ -852,7 +936,8 @@ describe("de-fi functional tests", () => {
       BigInt(stateBefore.totalStakedUsdc.toString()) * 1000n;
 
     const expectedOldRateDelta = (elapsed * oldRate * precision) / totalStaked;
-    const expectedNewRateDelta = (elapsed * BigInt(newRate) * precision) / totalStaked;
+    const expectedNewRateDelta =
+      (elapsed * BigInt(newRate) * precision) / totalStaked;
 
     expect(deltaRps > 0n).to.equal(true);
     expect(deltaRps <= expectedOldRateDelta + 10n).to.equal(true);
@@ -889,7 +974,11 @@ describe("de-fi functional tests", () => {
   it("Rejects multisig actions from unauthorized signers", async () => {
     console.log("--- Unauthorized Multisig Access Test ---");
     const unauthorizedSigner = anchor.web3.Keypair.generate();
-    await transferSol(admin, unauthorizedSigner.publicKey, 0.5 * anchor.web3.LAMPORTS_PER_SOL);
+    await transferSol(
+      admin,
+      unauthorizedSigner.publicKey,
+      0.5 * anchor.web3.LAMPORTS_PER_SOL
+    );
 
     try {
       await program.methods
@@ -921,7 +1010,14 @@ describe("de-fi functional tests", () => {
     const amountIn = new anchor.BN(100_000_000);
     const minAmountOut = new anchor.BN(1);
 
-    await mintTo(connection, admin, tokenA, userAtaA, admin.publicKey, amountIn.toNumber());
+    await mintTo(
+      connection,
+      admin,
+      tokenA,
+      userAtaA,
+      admin.publicKey,
+      amountIn.toNumber()
+    );
 
     try {
       await program.methods

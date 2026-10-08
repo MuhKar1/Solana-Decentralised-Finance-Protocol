@@ -51,9 +51,7 @@ export function WalletStatus() {
   const [copied, setCopied] = React.useState(false);
 
   const base58 = publicKey?.toBase58();
-  const display = base58
-    ? `${base58.slice(0, 4)}...${base58.slice(-4)}`
-    : "";
+  const display = base58 ? `${base58.slice(0, 4)}...${base58.slice(-4)}` : "";
 
   const copy = useCallback(() => {
     if (base58) {

@@ -32,7 +32,9 @@ export function useTx() {
         const signature = await executor();
         // The executor has already submitted; confirmation is in-flight.
         setStatus("confirming");
-        setOk(successMsg ?? `Transaction confirmed: ${signature.slice(0, 12)}...`);
+        setOk(
+          successMsg ?? `Transaction confirmed: ${signature.slice(0, 12)}...`
+        );
         setStatus("confirmed");
         return signature;
       } catch (e) {

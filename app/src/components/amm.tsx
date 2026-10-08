@@ -7,6 +7,14 @@ import { useTx } from "@/hooks/use-tx";
 import { usePortfolio, fetchProtocolState } from "@/hooks/use-protocol-data";
 import { LAMPORTS, USDC_BASE } from "@/lib/constants";
 import { Inp, ABtn, Err, Ok, KV, SC } from "@/components/ui";
+import {
+  usePythPrices,
+  formatUsdPrice,
+  solUsdcRate,
+} from "@/hooks/use-pyth-prices";
+import { OracleBadges, OracleFeedCard } from "@/components/oracle";
+import { derivePoolOracleFeeds } from "@/lib/oracle";
+import type { PublicKey } from "@solana/web3.js";
 
 export function SwapPanel({
   program,
@@ -19,20 +27,40 @@ export function SwapPanel({
 }) {
   const swap = useSwap(program, provider, usdcMint);
   const tx = useTx();
+  const { sol, usdc } = usePythPrices();
   const [amtIn, setAmtIn] = useState("");
   const [slippage, setSlippage] = useState("1");
+  const [feeds, setFeeds] = useState<{
+    feedA: PublicKey;
+    feedB: PublicKey;
+  } | null>(null);
+
+  const rate = solUsdcRate(sol, usdc);
+
+  useEffect(() => {
+    if (!provider) return;
+    derivePoolOracleFeeds(provider, usdcMint)
+      .then((f) => f && setFeeds({ feedA: f.feedA, feedB: f.feedB }))
+      .catch(() => {});
+  }, [provider, usdcMint]);
+
+  const pIn = parseFloat(amtIn);
+  const estimatedOut =
+    !isNaN(pIn) && pIn > 0 && rate !== null ? pIn * rate : null;
 
   const run = useCallback(async () => {
+    const input = parseFloat(amtIn);
     await tx.run(async () => {
-      const pIn = parseFloat(amtIn);
+      if (isNaN(input) || input <= 0)
+        throw new Error("Enter a valid input amount.");
       const slp = parseFloat(slippage);
-      if (isNaN(pIn) || pIn <= 0) throw new Error("Enter a valid input amount.");
       if (isNaN(slp) || slp < 0) throw new Error("Enter a valid slippage.");
-      // The program is authoritative: the frontend only builds the tx and
-      // passes a conservative min-out derived from the user's tolerance.
-      const estimatedOut = pIn * (1 - slp / 100);
-      const rawIn = new BN(Math.floor(pIn * LAMPORTS));
-      const rawOut = new BN(Math.floor(Math.max(0, estimatedOut) * USDC_BASE));
+      // The program is authoritative; the frontend passes a conservative
+      // min-out derived from the user's tolerance.
+      const rawIn = new BN(Math.floor(input * LAMPORTS));
+      const rawOut = new BN(
+        Math.floor(Math.max(0, input * (1 - slp / 100)) * USDC_BASE)
+      );
       const sig = await swap(rawIn, rawOut);
       setAmtIn("");
       return sig;
@@ -42,12 +70,54 @@ export function SwapPanel({
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-sky-300">Swap Tokens</h3>
-        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Swap SOL → USDC via the AMM pool.</p>
+        <h3 className="text-base sm:text-lg font-semibold text-sky-300">
+          Swap Tokens
+        </h3>
+        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          Swap SOL → USDC via the AMM pool.
+        </p>
       </div>
+
+      <div className="glass rounded-xl p-3 sm:p-4 border-sky-500/10">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-xs text-slate-400 uppercase tracking-wider">
+            Pyth Oracle Quote
+          </p>
+          <span className="text-[10px] font-mono text-slate-500">
+            price feed driven
+          </span>
+        </div>
+        <div className="text-xs sm:text-sm font-mono text-slate-300 space-y-1">
+          <div>
+            SOL/USD: <span className="text-sky-300">{formatUsdPrice(sol)}</span>
+          </div>
+          <div>
+            USDC/USD:{" "}
+            <span className="text-emerald-300">{formatUsdPrice(usdc)}</span>
+          </div>
+          <div>
+            1 SOL ≈ {rate !== null ? `${rate.toFixed(4)} USDC` : "—"}{" "}
+            <span className="text-slate-500">(implied by oracle)</span>
+          </div>
+        </div>
+      </div>
+
       <Inp label="Amount In (SOL)" val={amtIn} set={setAmtIn} ph="0.0" />
+
+      {estimatedOut !== null && (
+        <p className="text-xs text-slate-400">
+          Estimated output:{" "}
+          <span className="font-mono text-slate-200">
+            {estimatedOut.toFixed(4)} USDC
+          </span>{" "}
+          <span className="text-slate-500">(before slippage/fees)</span>
+        </p>
+      )}
+
       <div>
-        <label className="text-xs text-slate-400 uppercase tracking-wider">Slippage Tolerance (%)</label>
+        <label className="text-xs text-slate-400 uppercase tracking-wider">
+          Slippage Tolerance (%)
+        </label>
         <div className="flex gap-2 mt-1.5">
           {["0.5", "1", "3"].map((v) => (
             <button
@@ -74,7 +144,15 @@ export function SwapPanel({
           <span className="text-xs text-slate-500 self-center">%</span>
         </div>
       </div>
-      <ABtn label="Swap SOL → USDC" onClick={run} status={tx.status} disabled={!amtIn} />
+
+      <OracleFeedCard feedA={feeds?.feedA} feedB={feeds?.feedB} />
+
+      <ABtn
+        label="Swap SOL → USDC"
+        onClick={run}
+        status={tx.status}
+        disabled={!amtIn}
+      />
       <Err message={tx.error} />
       <Ok message={tx.ok} />
     </div>
@@ -145,16 +223,34 @@ export function LiquidityPanel({
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-sky-300">Liquidity Management</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-sky-300">
+          Liquidity Management
+        </h3>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Add SOL+USDC to earn swap fees, or remove LP tokens.
         </p>
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <KV label="LP Tokens" value={portfolio.lpTokens !== null ? `${portfolio.lpTokens} LP` : "—"} />
-        <KV label="Pool Share" value={portfolio.lpShare !== null ? `${portfolio.lpShare}%` : "—"} />
-        <KV label="Staked SOL" value={portfolio.stakedSol !== null ? `${portfolio.stakedSol} SOL` : "—"} />
-        <KV label="Staked USDC" value={portfolio.stakedUsdc !== null ? `${portfolio.stakedUsdc} USDC` : "—"} />
+        <KV
+          label="LP Tokens"
+          value={portfolio.lpTokens !== null ? `${portfolio.lpTokens} LP` : "—"}
+        />
+        <KV
+          label="Pool Share"
+          value={portfolio.lpShare !== null ? `${portfolio.lpShare}%` : "—"}
+        />
+        <KV
+          label="Staked SOL"
+          value={
+            portfolio.stakedSol !== null ? `${portfolio.stakedSol} SOL` : "—"
+          }
+        />
+        <KV
+          label="Staked USDC"
+          value={
+            portfolio.stakedUsdc !== null ? `${portfolio.stakedUsdc} USDC` : "—"
+          }
+        />
       </div>
       <div className="flex gap-2">
         {(["add", "remove"] as const).map((m) => (
@@ -178,7 +274,12 @@ export function LiquidityPanel({
             <Inp label="Amount B (USDC)" val={amtB} set={setAmtB} />
           </div>
           <Inp label="Min LP Tokens (slippage)" val={minLp} set={setMinLp} />
-          <ABtn label="Add Liquidity" onClick={runAdd} status={tx.status} disabled={!amtA || !amtB} />
+          <ABtn
+            label="Add Liquidity"
+            onClick={runAdd}
+            status={tx.status}
+            disabled={!amtA || !amtB}
+          />
         </>
       ) : (
         <>
@@ -187,7 +288,12 @@ export function LiquidityPanel({
             <Inp label="Min Token A (SOL)" val={minA} set={setMinA} />
             <Inp label="Min Token B (USDC)" val={minB} set={setMinB} />
           </div>
-          <ABtn label="Remove Liquidity" onClick={runRemove} status={tx.status} disabled={!lpAmt} />
+          <ABtn
+            label="Remove Liquidity"
+            onClick={runRemove}
+            status={tx.status}
+            disabled={!lpAmt}
+          />
         </>
       )}
       <Err message={tx.error} />
@@ -204,25 +310,42 @@ export function PoolInfoPanel({
   usdcMint: any;
 }) {
   const [state, setState] = useState<any>(null);
+  const [feeds, setFeeds] = useState<{
+    feedA: PublicKey;
+    feedB: PublicKey;
+  } | null>(null);
+
   useEffect(() => {
     if (!provider) return;
     fetchProtocolState(provider, usdcMint).then(setState);
+    derivePoolOracleFeeds(provider, usdcMint)
+      .then((f) => f && setFeeds({ feedA: f.feedA, feedB: f.feedB }))
+      .catch(() => {});
   }, [provider, usdcMint]);
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-sky-300">Pool Information</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-sky-300">
+          Pool Information
+        </h3>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Constant-product AMM (x·y=k) between SOL and USDC.
         </p>
       </div>
+
+      <OracleBadges />
+      <OracleFeedCard feedA={feeds?.feedA} feedB={feeds?.feedB} />
+
       <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
         <SC label="Swap Fee" value={state?.poolFee ?? "..."} />
         <SC label="Flash Loan Fee" value={state?.poolFlashFee ?? "..."} />
         <SC label="SOL Liquidity" value={state?.poolSolBal ?? "..."} />
         <SC label="USDC Liquidity" value={state?.poolUsdcBal ?? "..."} />
-        <SC label="Approved Flash Loan Callback" value={state?.flashLoanCbProgram ?? "..."} />
+        <SC
+          label="Approved Flash Loan Callback"
+          value={state?.flashLoanCbProgram ?? "..."}
+        />
       </div>
     </div>
   );

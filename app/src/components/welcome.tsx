@@ -21,9 +21,21 @@ export function WelcomeScreen() {
           emergency safety mechanisms — running on Solana Devnet.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 text-left mt-4 sm:mt-6">
-          <FC emoji="🔐" title="Multi-Sig Admin" desc="3-of-3 signer governance with timelock" />
-          <FC emoji="💧" title="Liquidity Pools" desc="Constant-product AMM with flash loans" />
-          <FC emoji="🏆" title="Staking Rewards" desc="Stake SOL or USDC to earn yield" />
+          <FC
+            emoji="🔐"
+            title="Multi-Sig Admin"
+            desc="3-of-3 signer governance with timelock"
+          />
+          <FC
+            emoji="💧"
+            title="Liquidity Pools"
+            desc="Constant-product AMM with flash loans"
+          />
+          <FC
+            emoji="🏆"
+            title="Staking Rewards"
+            desc="Stake SOL or USDC to earn yield"
+          />
         </div>
         <div className="pt-2 sm:pt-4">
           <WalletMultiButton />

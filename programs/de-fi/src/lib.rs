@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
-use crate::instructions::{admin, liquidity, staking};
 use crate::instructions::*;
+use crate::instructions::{admin, liquidity, staking};
 use crate::state::ActionType;
 
 pub mod errors;
@@ -95,8 +95,13 @@ pub mod defi {
         admin::update_flash_loan_callback_program(ctx)
     }
 
-    pub fn create_pool(ctx: Context<CreatePool>, fee_basis_points: u16) -> Result<()> {
-        liquidity::create_pool(ctx, fee_basis_points)
+    pub fn create_pool(
+        ctx: Context<CreatePool>,
+        fee_basis_points: u16,
+        pyth_price_feed_a: Pubkey,
+        pyth_price_feed_b: Pubkey,
+    ) -> Result<()> {
+        liquidity::create_pool(ctx, fee_basis_points, pyth_price_feed_a, pyth_price_feed_b)
     }
 
     pub fn flash_loan<'info>(

@@ -139,4 +139,6 @@ pub struct Pool {
     pub fee_basis_points: u16,
     pub k_last: u128,
     pub flash_loan_fee_basis_points: u16,
+    pub pyth_price_feed_a: Pubkey,
+    pub pyth_price_feed_b: Pubkey,
 }

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Keypair, Transaction } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  Keypair,
+  Transaction,
+} from "@solana/web3.js";
 import { BN } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
@@ -31,14 +36,22 @@ import { useCreatePool } from "@/hooks/use-amm";
 import { useTx } from "@/hooks/use-tx";
 import { fetchProtocolState } from "@/hooks/use-protocol-data";
 import { getUsdcMint, setUsdcMint, hasUsdcMint } from "@/lib/usdc-mint";
+import { PYTH_SOL_FEED_PUBKEY, PYTH_USDC_FEED_PUBKEY } from "@/lib/oracle";
 import { Inp, InpTxt, ABtn, Err, Ok, KV } from "@/components/ui";
 
-function wrapSol(provider: any, owner: PublicKey, ata: PublicKey, lamports: number) {
+function wrapSol(
+  provider: any,
+  owner: PublicKey,
+  ata: PublicKey,
+  lamports: number
+) {
   const conn = provider.connection;
   return async () => {
     const { blockhash } = await conn.getLatestBlockhash();
     const tx = new Transaction()
-      .add(SystemProgram.transfer({ fromPubkey: owner, toPubkey: ata, lamports }))
+      .add(
+        SystemProgram.transfer({ fromPubkey: owner, toPubkey: ata, lamports })
+      )
       .add(createSyncNativeInstruction(ata));
     tx.feePayer = owner;
     tx.recentBlockhash = blockhash;
@@ -87,19 +100,25 @@ export function AdminPanel({
   const [fundSolAmt, setFundSolAmt] = useState("");
   const [fundUsdcAmt, setFundUsdcAmt] = useState("");
   const [protocol, setProtocol] = useState<any>(null);
-  const [signerFull, setSignerFull] = useState<{ s1: string; s2: string; s3: string } | null>(null);
+  const [signerFull, setSignerFull] = useState<{
+    s1: string;
+    s2: string;
+    s3: string;
+  } | null>(null);
   const [usdcReady, setUsdcReady] = useState(hasUsdcMint());
 
   const wsolMint = new PublicKey("So11111111111111111111111111111111111111112");
 
   const doInitializeState = useCallback(async () => {
     await tx.run(async () => {
-      if (!signer1 || !signer2 || !signer3) throw new Error("All three signer public keys are required.");
+      if (!signer1 || !signer2 || !signer3)
+        throw new Error("All three signer public keys are required.");
       const s1 = new PublicKey(signer1);
       const s2 = new PublicKey(signer2);
       const s3 = new PublicKey(signer3);
       const tl = parseInt(timelock);
-      if (isNaN(tl) || tl < 0) throw new Error("Timelock delay must be a positive number.");
+      if (isNaN(tl) || tl < 0)
+        throw new Error("Timelock delay must be a positive number.");
       return initState(s1, s2, s3, new BN(tl));
     }, "State initialized!");
   }, [tx, initState, signer1, signer2, signer3, timelock]);
@@ -225,15 +244,21 @@ export function AdminPanel({
       if (isNaN(p) || p <= 0) throw new Error("Enter a valid positive amount.");
       const raw = new BN(Math.floor(p * 1_000_000));
       const mint = getUsdcMint();
-      if (mint.equals(PublicKey.default)) throw new Error("Initialize USDC accounts first.");
+      if (mint.equals(PublicKey.default))
+        throw new Error("Initialize USDC accounts first.");
       const [sp] = getStatePda();
       const [rv] = getRewardVaultPda(1);
       const ata = await ensureAta(provider, pk, mint);
       // Mint enough if low.
       const info = await provider.connection.getAccountInfo(ata);
-      const bal = info && info.data.length >= 72
-        ? new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(0, true)
-        : BigInt(0);
+      const bal =
+        info && info.data.length >= 72
+          ? new DataView(
+              info.data.buffer,
+              info.data.byteOffset + 64,
+              8
+            ).getBigUint64(0, true)
+          : BigInt(0);
       if (bal < BigInt(raw.toString())) {
         const { blockhash } = await provider.connection.getLatestBlockhash();
         const mintTx = new Transaction().add(
@@ -260,7 +285,8 @@ export function AdminPanel({
   const doCreatePool = useCallback(async () => {
     await tx.run(async () => {
       const fee = parseInt(feeBps);
-      if (isNaN(fee) || fee < 0 || fee > 1000) throw new Error("Fee must be 0-1000 basis points.");
+      if (isNaN(fee) || fee < 0 || fee > 1000)
+        throw new Error("Fee must be 0-1000 basis points.");
       return createPool(fee);
     }, "Pool created!");
   }, [tx, createPool, feeBps]);
@@ -273,11 +299,17 @@ export function AdminPanel({
   const [govRewardRate, setGovRewardRate] = useState("50");
 
   const doProposePause = useCallback(async () => {
-    await tx.run(() => propose({ pause: {} }, Buffer.alloc(0)), "Pause proposed!");
+    await tx.run(
+      () => propose({ pause: {} }, Buffer.alloc(0)),
+      "Pause proposed!"
+    );
   }, [tx, propose]);
 
   const doProposeUnpause = useCallback(async () => {
-    await tx.run(() => propose({ unpause: {} }, Buffer.alloc(0)), "Unpause proposed!");
+    await tx.run(
+      () => propose({ unpause: {} }, Buffer.alloc(0)),
+      "Unpause proposed!"
+    );
   }, [tx, propose]);
 
   const doProposeRewardRate = useCallback(async () => {
@@ -325,20 +357,23 @@ export function AdminPanel({
     loadState();
   }, [loadState]);
 
-  const currentSignerIndex = signerFull && pk
-    ? pk.toBase58() === signerFull.s1
-      ? 1
-      : pk.toBase58() === signerFull.s2
+  const currentSignerIndex =
+    signerFull && pk
+      ? pk.toBase58() === signerFull.s1
+        ? 1
+        : pk.toBase58() === signerFull.s2
         ? 2
         : pk.toBase58() === signerFull.s3
-          ? 3
-          : 0
-    : 0;
+        ? 3
+        : 0
+      : 0;
 
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-amber-400">Admin Controls</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-amber-400">
+          Admin Controls
+        </h3>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Protocol initialization and multi-sig governance.
         </p>
@@ -349,20 +384,40 @@ export function AdminPanel({
           <InpTxt label="Signer 1 (Pubkey)" val={signer1} set={setS1} />
           <InpTxt label="Signer 2 (Pubkey)" val={signer2} set={setS2} />
           <InpTxt label="Signer 3 (Pubkey)" val={signer3} set={setS3} />
-          <Inp label="Timelock Delay (seconds)" val={timelock} set={setTimelock} ph="86400" />
+          <Inp
+            label="Timelock Delay (seconds)"
+            val={timelock}
+            set={setTimelock}
+            ph="86400"
+          />
         </div>
-        <ABtn label="Initialize State" onClick={doInitializeState} status={tx.status} disabled={!signer1 || !signer2 || !signer3} />
+        <ABtn
+          label="Initialize State"
+          onClick={doInitializeState}
+          status={tx.status}
+          disabled={!signer1 || !signer2 || !signer3}
+        />
       </Section>
 
       <Section title="2. Initialize SOL Accounts">
-        <ABtn label="Initialize SOL Accounts" onClick={doInitializeSol} status={tx.status} />
+        <ABtn
+          label="Initialize SOL Accounts"
+          onClick={doInitializeSol}
+          status={tx.status}
+        />
       </Section>
 
       <Section title="3. Initialize USDC Accounts">
         <p className="text-xs text-slate-500 mb-2">
-          {usdcReady ? `USDC mint: ${getUsdcMint().toBase58().slice(0, 8)}...` : "Creates USDC mint + PDA accounts, then mints test USDC to your wallet."}
+          {usdcReady
+            ? `USDC mint: ${getUsdcMint().toBase58().slice(0, 8)}...`
+            : "Creates USDC mint + PDA accounts, then mints test USDC to your wallet."}
         </p>
-        <ABtn label="Initialize USDC Accounts" onClick={doInitializeUsdc} status={tx.status} />
+        <ABtn
+          label="Initialize USDC Accounts"
+          onClick={doInitializeUsdc}
+          status={tx.status}
+        />
       </Section>
 
       <Section title="Fund Reward Vaults">
@@ -371,10 +426,18 @@ export function AdminPanel({
           <Inp label="USDC amount" val={fundUsdcAmt} set={setFundUsdcAmt} />
         </div>
         <div className="flex gap-2">
-          <button onClick={doFundSol} className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all" disabled={tx.status !== "idle"}>
+          <button
+            onClick={doFundSol}
+            className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
             Fund SOL Vault
           </button>
-          <button onClick={doFundUsdc} className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all" disabled={tx.status !== "idle"}>
+          <button
+            onClick={doFundUsdc}
+            className="flex-1 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
             Fund USDC Vault
           </button>
         </div>
@@ -382,6 +445,35 @@ export function AdminPanel({
 
       <Section title="5. Create Liquidity Pool">
         <Inp label="Fee (basis points)" val={feeBps} set={setFeeBps} ph="30" />
+        <div className="mt-3 space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wider text-slate-500">
+            Pyth feed accounts embedded in this pool
+          </p>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">
+              Feed A (SOL/USD)
+            </span>
+            <span
+              className="font-mono text-xs text-emerald-300"
+              title={PYTH_SOL_FEED_PUBKEY.toBase58()}
+            >
+              {PYTH_SOL_FEED_PUBKEY.toBase58().slice(0, 6)}…
+              {PYTH_SOL_FEED_PUBKEY.toBase58().slice(-6)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500">
+              Feed B (USDC/USD)
+            </span>
+            <span
+              className="font-mono text-xs text-emerald-300"
+              title={PYTH_USDC_FEED_PUBKEY.toBase58()}
+            >
+              {PYTH_USDC_FEED_PUBKEY.toBase58().slice(0, 6)}…
+              {PYTH_USDC_FEED_PUBKEY.toBase58().slice(-6)}
+            </span>
+          </div>
+        </div>
         <div className="mt-3">
           <ABtn label="Create Pool" onClick={doCreatePool} status={tx.status} />
         </div>
@@ -394,17 +486,61 @@ export function AdminPanel({
           </div>
         )}
         <div className="flex flex-wrap gap-2">
-          <button onClick={doProposePause} className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" disabled={tx.status !== "idle"}>Propose Pause</button>
-          <button onClick={doProposeUnpause} className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all" disabled={tx.status !== "idle"}>Propose Unpause</button>
-          <button onClick={doApprove} className="px-3 py-2 rounded-xl text-xs font-semibold bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-all" disabled={tx.status !== "idle"}>Approve</button>
-          <button onClick={doCancel} className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all" disabled={tx.status !== "idle"}>Cancel</button>
-          <button onClick={() => doExecute("pause")} className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all" disabled={tx.status !== "idle"}>Execute Pause</button>
-          <button onClick={() => doExecute("unpause")} className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all" disabled={tx.status !== "idle"}>Execute Unpause</button>
+          <button
+            onClick={doProposePause}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
+            Propose Pause
+          </button>
+          <button
+            onClick={doProposeUnpause}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
+            Propose Unpause
+          </button>
+          <button
+            onClick={doApprove}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
+            Approve
+          </button>
+          <button
+            onClick={doCancel}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => doExecute("pause")}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
+            Execute Pause
+          </button>
+          <button
+            onClick={() => doExecute("unpause")}
+            className="px-3 py-2 rounded-xl text-xs font-semibold bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-all"
+            disabled={tx.status !== "idle"}
+          >
+            Execute Unpause
+          </button>
         </div>
         <div className="mt-3 flex gap-2 items-center">
-          <Inp label="New Reward Rate" val={govRewardRate} set={setGovRewardRate} />
+          <Inp
+            label="New Reward Rate"
+            val={govRewardRate}
+            set={setGovRewardRate}
+          />
           <div className="pt-5">
-            <button onClick={doProposeRewardRate} className="px-3 py-2 rounded-xl text-xs font-semibold bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition-all" disabled={tx.status !== "idle"}>
+            <button
+              onClick={doProposeRewardRate}
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition-all"
+              disabled={tx.status !== "idle"}
+            >
               Propose Rate
             </button>
           </div>
@@ -414,17 +550,50 @@ export function AdminPanel({
       {protocol && (
         <Section title="Live Protocol State">
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <KV label="Paused" value={protocol.paused === null ? "—" : protocol.paused ? "⏸ PAUSED" : "✅ ACTIVE"} />
+            <KV
+              label="Paused"
+              value={
+                protocol.paused === null
+                  ? "—"
+                  : protocol.paused
+                  ? "⏸ PAUSED"
+                  : "✅ ACTIVE"
+              }
+            />
             <KV label="Reward Rate" value={protocol.rewardRate ?? "—"} />
-            <KV label="Total Staked SOL" value={protocol.totalStakedSol ?? "—"} />
-            <KV label="Total Staked USDC" value={protocol.totalStakedUsdc ?? "—"} />
-            <KV label="SOL Vault" value={protocol.solVault !== null ? `${protocol.solVault} SOL` : "—"} />
-            <KV label="USDC Vault" value={protocol.usdcVault !== null ? `${protocol.usdcVault} USDC` : "—"} />
+            <KV
+              label="Total Staked SOL"
+              value={protocol.totalStakedSol ?? "—"}
+            />
+            <KV
+              label="Total Staked USDC"
+              value={protocol.totalStakedUsdc ?? "—"}
+            />
+            <KV
+              label="SOL Vault"
+              value={
+                protocol.solVault !== null ? `${protocol.solVault} SOL` : "—"
+              }
+            />
+            <KV
+              label="USDC Vault"
+              value={
+                protocol.usdcVault !== null ? `${protocol.usdcVault} USDC` : "—"
+              }
+            />
             <KV label="Timelock" value={protocol.timelockDelay ?? "—"} />
-            <KV label="Required Sigs" value={protocol.requiredSignatures ?? "—"} />
+            <KV
+              label="Required Sigs"
+              value={protocol.requiredSignatures ?? "—"}
+            />
             <KV label="Min Stake" value={protocol.minStakeAmt ?? "—"} />
           </div>
-          <button onClick={loadState} className="mt-3 px-3 py-2 rounded-xl text-xs font-semibold bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-all">↻ Refresh</button>
+          <button
+            onClick={loadState}
+            className="mt-3 px-3 py-2 rounded-xl text-xs font-semibold bg-sky-500/10 border border-sky-500/20 text-sky-400 hover:bg-sky-500/20 transition-all"
+          >
+            ↻ Refresh
+          </button>
         </Section>
       )}
 
@@ -434,7 +603,13 @@ export function AdminPanel({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="glass rounded-xl p-4 border-amber-500/10">
       <h4 className="text-sm font-semibold text-amber-300 mb-2">{title}</h4>

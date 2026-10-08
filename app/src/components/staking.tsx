@@ -16,10 +16,7 @@ import { LAMPORTS, USDC_BASE } from "@/lib/constants";
 import type { TokenType } from "@/lib/constants";
 import { Inp, ABtn, Err, Ok, TS, KV } from "@/components/ui";
 
-function amountToRaw(
-  tt: TokenType,
-  input: string
-): { p: number; raw: BN } {
+function amountToRaw(tt: TokenType, input: string): { p: number; raw: BN } {
   const p = parseFloat(input);
   const base = tt === 0 ? LAMPORTS : USDC_BASE;
   return { p, raw: new BN(Math.floor(p * base)) };
@@ -42,8 +39,10 @@ export function StakePanel({
     async (tt: TokenType, input: string) => {
       await tx.run(async () => {
         const { p, raw } = amountToRaw(tt, input);
-        if (isNaN(p) || p <= 0) throw new Error("Enter a valid positive amount.");
-        if (tt === 0 && raw.lt(new BN(LAMPORTS))) throw new Error("Minimum: 1 SOL.");
+        if (isNaN(p) || p <= 0)
+          throw new Error("Enter a valid positive amount.");
+        if (tt === 0 && raw.lt(new BN(LAMPORTS)))
+          throw new Error("Minimum: 1 SOL.");
         if (tt === 1 && raw.lt(new BN(1_000_000_000)))
           throw new Error("Minimum: 1,000 USDC (contract-enforced).");
         return stake(tt, raw);
@@ -57,7 +56,9 @@ export function StakePanel({
     <div className="space-y-5">
       <div>
         <h3 className="text-lg font-semibold text-white">Stake</h3>
-        <p className="text-xs text-slate-500 mt-0.5">Earn yield by depositing SOL or USDC</p>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Earn yield by depositing SOL or USDC
+        </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <StakeCard
@@ -113,11 +114,23 @@ function StakeCard({
       </div>
       <div className="mb-4 flex items-center justify-between text-xs">
         <span className="text-slate-500">Your stake</span>
-        <span className="text-slate-300 font-mono">{yourStake !== null ? `${yourStake} ${symbol}` : "—"}</span>
+        <span className="text-slate-300 font-mono">
+          {yourStake !== null ? `${yourStake} ${symbol}` : "—"}
+        </span>
       </div>
-      <Inp label="Amount" val={amt} set={setAmt} ph={tt === 0 ? "1.0" : "1000"} />
+      <Inp
+        label="Amount"
+        val={amt}
+        set={setAmt}
+        ph={tt === 0 ? "1.0" : "1000"}
+      />
       <div className="mt-3">
-        <ABtn label={`Stake ${symbol}`} onClick={() => onStake(amt)} status={status} disabled={!amt} />
+        <ABtn
+          label={`Stake ${symbol}`}
+          onClick={() => onStake(amt)}
+          status={status}
+          disabled={!amt}
+        />
       </div>
     </div>
   );
@@ -141,7 +154,8 @@ export function UnstakePanel({
     async (tt: TokenType, input: string) => {
       await tx.run(async () => {
         const { p, raw } = amountToRaw(tt, input);
-        if (isNaN(p) || p <= 0) throw new Error("Enter a valid positive amount.");
+        if (isNaN(p) || p <= 0)
+          throw new Error("Enter a valid positive amount.");
         return unstake(tt, raw);
       }, `Unstaked ${input}`);
       refresh();
@@ -151,7 +165,10 @@ export function UnstakePanel({
 
   const runEmergency = useCallback(
     async (tt: TokenType) => {
-      await tx.run(() => emergency(tt), `Emergency unstaked ${tt === 0 ? "SOL" : "USDC"}`);
+      await tx.run(
+        () => emergency(tt),
+        `Emergency unstaked ${tt === 0 ? "SOL" : "USDC"}`
+      );
       refresh();
     },
     [emergency, tx, refresh]
@@ -160,14 +177,28 @@ export function UnstakePanel({
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-sky-300">Unstake Tokens</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-sky-300">
+          Unstake Tokens
+        </h3>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Withdraw staked tokens from either pool. Rewards update automatically.
         </p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-        <UnstakeCard tt={0} yourStake={portfolio.stakedSol} onUnstake={(i) => runUnstake(0, i)} onEmergency={() => runEmergency(0)} status={tx.status} />
-        <UnstakeCard tt={1} yourStake={portfolio.stakedUsdc} onUnstake={(i) => runUnstake(1, i)} onEmergency={() => runEmergency(1)} status={tx.status} />
+        <UnstakeCard
+          tt={0}
+          yourStake={portfolio.stakedSol}
+          onUnstake={(i) => runUnstake(0, i)}
+          onEmergency={() => runEmergency(0)}
+          status={tx.status}
+        />
+        <UnstakeCard
+          tt={1}
+          yourStake={portfolio.stakedUsdc}
+          onUnstake={(i) => runUnstake(1, i)}
+          onEmergency={() => runEmergency(1)}
+          status={tx.status}
+        />
       </div>
       <Err message={tx.error} />
       <Ok message={tx.ok} />
@@ -199,13 +230,24 @@ function UnstakeCard({
       <div className="p-2 rounded-lg bg-sky-500/5 border border-sky-500/10 text-sky-400/80 text-xs space-y-1">
         <div className="flex justify-between">
           <span>Your stake</span>
-          <span className="font-mono">{yourStake !== null ? `${yourStake} ${symbol}` : "—"}</span>
+          <span className="font-mono">
+            {yourStake !== null ? `${yourStake} ${symbol}` : "—"}
+          </span>
         </div>
       </div>
       <Inp label={`Amount (${symbol})`} val={amt} set={setAmt} ph="0.0" />
-      <ABtn label={`Unstake ${symbol}`} onClick={() => onUnstake(amt)} status={status} disabled={!amt} />
+      <ABtn
+        label={`Unstake ${symbol}`}
+        onClick={() => onUnstake(amt)}
+        status={status}
+        disabled={!amt}
+      />
       <div className="pt-2 border-t border-sky-500/10">
-        <ABtn label={`Emergency Unstake ${symbol}`} onClick={onEmergency} status={status} />
+        <ABtn
+          label={`Emergency Unstake ${symbol}`}
+          onClick={onEmergency}
+          status={status}
+        />
       </div>
     </div>
   );
@@ -230,15 +272,31 @@ export function ClaimPanel({
   return (
     <div className="space-y-4 sm:space-y-5">
       <div>
-        <h3 className="text-base sm:text-lg font-semibold text-sky-300">Claim Rewards</h3>
+        <h3 className="text-base sm:text-lg font-semibold text-sky-300">
+          Claim Rewards
+        </h3>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
           Collect accrued staking rewards and manage your stake accounts.
         </p>
       </div>
       <TS value={tt} onChange={setTt} />
       <div className="grid grid-cols-2 gap-2">
-        <KV label="SOL Rewards" value={portfolio.pendingRewardsSol !== null ? `${portfolio.pendingRewardsSol} SOL` : "—"} />
-        <KV label="USDC Rewards" value={portfolio.pendingRewardsUsdc !== null ? `${portfolio.pendingRewardsUsdc} USDC` : "—"} />
+        <KV
+          label="SOL Rewards"
+          value={
+            portfolio.pendingRewardsSol !== null
+              ? `${portfolio.pendingRewardsSol} SOL`
+              : "—"
+          }
+        />
+        <KV
+          label="USDC Rewards"
+          value={
+            portfolio.pendingRewardsUsdc !== null
+              ? `${portfolio.pendingRewardsUsdc} USDC`
+              : "—"
+          }
+        />
       </div>
       <ABtn
         label="Claim Rewards"

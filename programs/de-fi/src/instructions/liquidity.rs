@@ -4,17 +4,68 @@ use anchor_lang::solana_program::{
     program::invoke,
 };
 use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer};
+use pyth_sdk_solana::load_price_feed_from_account_info;
 
 use crate::errors::ErrorCode;
 use crate::events::*;
 use crate::state::{update_global_rewards, Pool, ProgramState, MINIMUM_LIQUIDITY};
+
+fn checked_pow10(exp: u32) -> Result<u128> {
+    let mut out = 1u128;
+    for _ in 0..exp {
+        out = out.checked_mul(10).ok_or(ErrorCode::Overflow)?;
+    }
+    Ok(out)
+}
+
+fn scaled_positive_price(price: i64, expo: i32, min_expo: i32) -> Result<u128> {
+    require!(price > 0, ErrorCode::InvalidOracleData);
+    let scale_exp = expo.checked_sub(min_expo).ok_or(ErrorCode::Underflow)? as u32;
+    (price as u128)
+        .checked_mul(checked_pow10(scale_exp)?)
+        .ok_or(ErrorCode::Overflow)
+        .map_err(Into::into)
+}
+
+fn validate_oracle_minimum_output(
+    amount_in: u64,
+    amount_out: u64,
+    token_in_decimals: u8,
+    token_out_decimals: u8,
+    oracle_price_in: i64,
+    oracle_expo_in: i32,
+    oracle_price_out: i64,
+    oracle_expo_out: i32,
+) -> Result<()> {
+    let min_expo = oracle_expo_in.min(oracle_expo_out);
+    let scaled_in = scaled_positive_price(oracle_price_in, oracle_expo_in, min_expo)?;
+    let scaled_out = scaled_positive_price(oracle_price_out, oracle_expo_out, min_expo)?;
+
+    let left = (amount_out as u128)
+        .checked_mul(scaled_out)
+        .ok_or(ErrorCode::Overflow)?
+        .checked_mul(checked_pow10(token_in_decimals as u32)?)
+        .ok_or(ErrorCode::Overflow)?
+        .checked_mul(100)
+        .ok_or(ErrorCode::Overflow)?;
+    let right = (amount_in as u128)
+        .checked_mul(scaled_in)
+        .ok_or(ErrorCode::Overflow)?
+        .checked_mul(checked_pow10(token_out_decimals as u32)?)
+        .ok_or(ErrorCode::Overflow)?
+        .checked_mul(95)
+        .ok_or(ErrorCode::Overflow)?;
+
+    require!(left >= right, ErrorCode::PriceDeviationTooHigh);
+    Ok(())
+}
 
 #[derive(Accounts)]
 pub struct CreatePool<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + 1 + 32 + 32 + 32 + 32 + 32 + 32 + 2 + 16 + 2,
+        space = 8 + 1 + 32 + 32 + 32 + 32 + 32 + 32 + 2 + 16 + 2 + 32 + 32,
         seeds = [b"pool", token_a_mint.key().as_ref(), token_b_mint.key().as_ref()],
         bump
     )]
@@ -215,9 +266,18 @@ pub struct Swap<'info> {
     #[account(mut, seeds = [b"state"], bump)]
     pub state: Box<Account<'info, ProgramState>>,
     pub token_program: Program<'info, Token>,
+    /// CHECK: Validated against pool.pyth_price_feed_a
+    pub pyth_price_a: UncheckedAccount<'info>,
+    /// CHECK: Validated against pool.pyth_price_feed_b
+    pub pyth_price_b: UncheckedAccount<'info>,
 }
 
-pub fn create_pool(ctx: Context<CreatePool>, fee_basis_points: u16) -> Result<()> {
+pub fn create_pool(
+    ctx: Context<CreatePool>,
+    fee_basis_points: u16,
+    pyth_price_feed_a: Pubkey,
+    pyth_price_feed_b: Pubkey,
+) -> Result<()> {
     require!(!ctx.accounts.state.paused, ErrorCode::Paused);
     require!(
         ctx.accounts.authority.key() == ctx.accounts.state.authority,
@@ -250,6 +310,8 @@ pub fn create_pool(ctx: Context<CreatePool>, fee_basis_points: u16) -> Result<()
     pool.fee_basis_points = fee_basis_points;
     pool.k_last = 0;
     pool.flash_loan_fee_basis_points = 30;
+    pool.pyth_price_feed_a = pyth_price_feed_a;
+    pool.pyth_price_feed_b = pyth_price_feed_b;
 
     emit!(PoolCreated {
         pool: pool.key(),
@@ -384,8 +446,7 @@ pub fn flash_loan<'info>(
         &all_accounts,
     )?;
 
-    ctx.accounts.pool_token_a.reload()?
-    ;
+    ctx.accounts.pool_token_a.reload()?;
     ctx.accounts.pool_token_b.reload()?;
 
     let final_reserve_a = ctx.accounts.pool_token_a.amount as u128;
@@ -796,6 +857,53 @@ pub fn swap(ctx: Context<Swap>, amount_in: u64, min_amount_out: u64) -> Result<(
     );
     msg!("Pool PDA: {}", ctx.accounts.pool.key());
 
+    let mut oracle_guard: Option<(i64, i32, i64, i32)> = None;
+    if ctx.accounts.pool.pyth_price_feed_a != Pubkey::default()
+        && ctx.accounts.pool.pyth_price_feed_b != Pubkey::default()
+    {
+        require!(
+            ctx.accounts.pyth_price_a.key() == ctx.accounts.pool.pyth_price_feed_a,
+            ErrorCode::InvalidOracleData
+        );
+        require!(
+            ctx.accounts.pyth_price_b.key() == ctx.accounts.pool.pyth_price_feed_b,
+            ErrorCode::InvalidOracleData
+        );
+
+        let price_account_a =
+            load_price_feed_from_account_info(&ctx.accounts.pyth_price_a.to_account_info())
+                .map_err(|_| ErrorCode::InvalidOracleData)?;
+        let price_account_b =
+            load_price_feed_from_account_info(&ctx.accounts.pyth_price_b.to_account_info())
+                .map_err(|_| ErrorCode::InvalidOracleData)?;
+
+        let current_time = Clock::get()?.unix_timestamp;
+        let pyth_price_a = price_account_a
+            .get_price_no_older_than(current_time, 60)
+            .ok_or(ErrorCode::StaleOraclePrice)?;
+        let pyth_price_b = price_account_b
+            .get_price_no_older_than(current_time, 60)
+            .ok_or(ErrorCode::StaleOraclePrice)?;
+
+        oracle_guard = Some(
+            if ctx.accounts.token_in.key() == ctx.accounts.pool.token_a_mint {
+                (
+                    pyth_price_a.price,
+                    pyth_price_a.expo,
+                    pyth_price_b.price,
+                    pyth_price_b.expo,
+                )
+            } else {
+                (
+                    pyth_price_b.price,
+                    pyth_price_b.expo,
+                    pyth_price_a.price,
+                    pyth_price_a.expo,
+                )
+            },
+        );
+    }
+
     let max_swap_a = ctx.accounts.pool_token_a.amount / 10;
     let max_swap_b = ctx.accounts.pool_token_b.amount / 10;
 
@@ -835,6 +943,19 @@ pub fn swap(ctx: Context<Swap>, amount_in: u64, min_amount_out: u64) -> Result<(
                 amount_out
             );
             return err!(ErrorCode::Slippage);
+        }
+
+        if let Some((price_in, expo_in, price_out, expo_out)) = oracle_guard {
+            validate_oracle_minimum_output(
+                amount_in,
+                amount_out,
+                ctx.accounts.token_in.decimals,
+                ctx.accounts.token_out.decimals,
+                price_in,
+                expo_in,
+                price_out,
+                expo_out,
+            )?;
         }
 
         token::transfer(
@@ -902,6 +1023,19 @@ pub fn swap(ctx: Context<Swap>, amount_in: u64, min_amount_out: u64) -> Result<(
             return err!(ErrorCode::Slippage);
         }
 
+        if let Some((price_in, expo_in, price_out, expo_out)) = oracle_guard {
+            validate_oracle_minimum_output(
+                amount_in,
+                amount_out,
+                ctx.accounts.token_in.decimals,
+                ctx.accounts.token_out.decimals,
+                price_in,
+                expo_in,
+                price_out,
+                expo_out,
+            )?;
+        }
+
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -945,7 +1079,10 @@ pub fn swap(ctx: Context<Swap>, amount_in: u64, min_amount_out: u64) -> Result<(
         .checked_mul(ctx.accounts.pool_token_b.amount as u128)
         .ok_or(ErrorCode::Overflow)?;
 
-    require!(invariant_after >= pool.k_last, ErrorCode::InvariantViolation);
+    require!(
+        invariant_after >= pool.k_last,
+        ErrorCode::InvariantViolation
+    );
     pool.k_last = invariant_after;
 
     emit!(SwapEvent {

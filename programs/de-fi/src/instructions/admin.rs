@@ -265,11 +265,7 @@ pub fn initialize_usdc_accounts(ctx: Context<InitializeUsdcAccounts>) -> Result<
     Ok(())
 }
 
-pub fn fund_reward_vault(
-    ctx: Context<FundRewardVault>,
-    amount: u64,
-    token_type: u8,
-) -> Result<()> {
+pub fn fund_reward_vault(ctx: Context<FundRewardVault>, amount: u64, token_type: u8) -> Result<()> {
     require!(!ctx.accounts.state.paused, ErrorCode::Paused);
     require!(
         ctx.accounts.authority.key() == ctx.accounts.state.authority,
@@ -302,7 +298,10 @@ pub fn pause(ctx: Context<Pause>) -> Result<()> {
     let state = &mut ctx.accounts.state;
     require_multisig_signer(state, ctx.accounts.admin.key())?;
     if let Some(pending) = &state.pending_action {
-        require!(pending.action_type == ActionType::Pause, ErrorCode::InvalidAction);
+        require!(
+            pending.action_type == ActionType::Pause,
+            ErrorCode::InvalidAction
+        );
 
         let approval_count = pending.approvals.iter().filter(|&&x| x).count();
         require!(
@@ -331,7 +330,10 @@ pub fn unpause(ctx: Context<Unpause>) -> Result<()> {
     let state = &mut ctx.accounts.state;
     require_multisig_signer(state, ctx.accounts.admin.key())?;
     if let Some(pending) = &state.pending_action {
-        require!(pending.action_type == ActionType::Unpause, ErrorCode::InvalidAction);
+        require!(
+            pending.action_type == ActionType::Unpause,
+            ErrorCode::InvalidAction
+        );
 
         let approval_count = pending.approvals.iter().filter(|&&x| x).count();
         require!(

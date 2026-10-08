@@ -33,7 +33,10 @@ export function useInitializeState(program: any, provider: any) {
 export function usePropose(program: any, provider: any) {
   const { publicKey: pk } = useWallet();
   return useCallback(
-    async (actionType: Record<string, unknown>, data: Buffer): Promise<string> => {
+    async (
+      actionType: Record<string, unknown>,
+      data: Buffer
+    ): Promise<string> => {
       if (!program || !provider || !pk) throw new Error("Wallet not connected");
       const [sp] = getStatePda();
       return program.methods

@@ -38,10 +38,11 @@ export async function wrapSolIfNeeded(
   const info = await conn.getAccountInfo(ata);
   const bal =
     info && info.data.length >= 72
-      ? new DataView(info.data.buffer, info.data.byteOffset + 64, 8).getBigUint64(
-          0,
-          true
-        )
+      ? new DataView(
+          info.data.buffer,
+          info.data.byteOffset + 64,
+          8
+        ).getBigUint64(0, true)
       : BigInt(0);
   if (bal < BigInt(lamports)) {
     const need = BigInt(lamports) - bal;

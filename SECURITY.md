@@ -10,15 +10,15 @@ This document provides a comprehensive analysis of the security architecture of 
 
 The protocol uses the **standard SPL Token program** (`TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA`) rather than Token-2022 (`TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb`).
 
-| Factor | SPL Token | Token-2022 | Protocol's Choice |
-|---|---|---|---|
-| **Maturity** | 5+ years, battle-tested | ~2 years | ✅ SPL Token |
-| **Audit surface** | Audited by dozens of firms | Larger surface area | ✅ SPL Token |
-| **Ecosystem compatibility** | Universal support | Some tools lag | ✅ SPL Token |
-| **Confidential transfers** | Not available | Available | Not needed |
-| **Transfer hooks** | Not available | Available | Not needed |
-| **Permanent delegate** | Not available | Available | ❌ Security risk |
-| **Metadata** | Not available | Available | Not needed |
+| Factor                      | SPL Token                  | Token-2022          | Protocol's Choice |
+| --------------------------- | -------------------------- | ------------------- | ----------------- |
+| **Maturity**                | 5+ years, battle-tested    | ~2 years            | ✅ SPL Token      |
+| **Audit surface**           | Audited by dozens of firms | Larger surface area | ✅ SPL Token      |
+| **Ecosystem compatibility** | Universal support          | Some tools lag      | ✅ SPL Token      |
+| **Confidential transfers**  | Not available              | Available           | Not needed        |
+| **Transfer hooks**          | Not available              | Available           | Not needed        |
+| **Permanent delegate**      | Not available              | Available           | ❌ Security risk  |
+| **Metadata**                | Not available              | Available           | Not needed        |
 
 ### Detailed Rationale
 
@@ -45,15 +45,15 @@ Every wallet (Phantom, Backpack, Solflare), every DEX aggregator (Jupiter), and 
 
 The Anchor framework was chosen over raw Solana program development for the following security properties:
 
-| Property | Without Anchor | With Anchor |
-|---|---|---|
-| Account ownership validation | Manual, error-prone | Automatic via `#[account]` |
-| PDA seed verification | Manual derivation | `seeds = [...]` macro with bump |
-| Signer checks | Manual `if !ctx.accounts.user.is_signer` | `Signer<'info>` type guarantees |
-| Rent exemption | Manual check | Automatic for `init` accounts |
-| Discriminator checks | Manual (8 bytes) | Built into Anchor account types |
-| Instruction data deserialization | Manual Borsh/byte manipulation | Automatic via `#[derive(AnchorSerialize, AnchorDeserialize)]` |
-| Cross-program invocation safety | Manual account ordering | Anchor's CPI context types |
+| Property                         | Without Anchor                           | With Anchor                                                   |
+| -------------------------------- | ---------------------------------------- | ------------------------------------------------------------- |
+| Account ownership validation     | Manual, error-prone                      | Automatic via `#[account]`                                    |
+| PDA seed verification            | Manual derivation                        | `seeds = [...]` macro with bump                               |
+| Signer checks                    | Manual `if !ctx.accounts.user.is_signer` | `Signer<'info>` type guarantees                               |
+| Rent exemption                   | Manual check                             | Automatic for `init` accounts                                 |
+| Discriminator checks             | Manual (8 bytes)                         | Built into Anchor account types                               |
+| Instruction data deserialization | Manual Borsh/byte manipulation           | Automatic via `#[derive(AnchorSerialize, AnchorDeserialize)]` |
+| Cross-program invocation safety  | Manual account ordering                  | Anchor's CPI context types                                    |
 
 ### Account Model & PDA Architecture
 
@@ -78,14 +78,14 @@ LP Mint:         PDA(["lp_token_mint", pool_pda])
 
 Many protocols split governance, staking, and AMM into separate deployed programs. This protocol uses a **monolithic deployment** for the following reasons:
 
-| Factor | Monolithic | Multi-Program |
-|---|---|---|
-| CPI overhead | Lower (same program invokes itself) | Higher (cross-program invocations) |
-| Atomic state updates | Natural (single transaction) | Requires careful ordering |
-| State sharing | Direct (same ProgramState) | Requires PDA lookup across programs |
-| Upgrade coordination | Single upgrade | Multi-program upgrade dance |
-| Audit scope | Single auditable unit | Multiple audit boundaries |
-| Composable innovation | Harder to extend externally | Easier for external integration |
+| Factor                | Monolithic                          | Multi-Program                       |
+| --------------------- | ----------------------------------- | ----------------------------------- |
+| CPI overhead          | Lower (same program invokes itself) | Higher (cross-program invocations)  |
+| Atomic state updates  | Natural (single transaction)        | Requires careful ordering           |
+| State sharing         | Direct (same ProgramState)          | Requires PDA lookup across programs |
+| Upgrade coordination  | Single upgrade                      | Multi-program upgrade dance         |
+| Audit scope           | Single auditable unit               | Multiple audit boundaries           |
+| Composable innovation | Harder to extend externally         | Easier for external integration     |
 
 **Why monolithic is correct here:** This is a vertically-integrated protocol where staking rewards interact with governance (reward rate updates), liquidity interacts with flash loans (same pool vaults), and pause affects all domains simultaneously. A monolithic architecture avoids the composability risks of cross-program calls for internal operations.
 
@@ -141,10 +141,10 @@ Once set at `initialize_state`, the 3 signer public keys **cannot be changed**. 
 
 The protocol has a **pause/unpause** mechanism governed by multi-sig. Both `pause` and `unpause` require 3-of-3 signer approval **and** the timelock delay to elapse (keyed off the proposal's `proposed_at` timestamp, not the final approval).
 
-| State | What's Blocked | What's Allowed |
-|---|---|---|
+| State      | What's Blocked                                                                                                                     | What's Allowed                                                                                                                    |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | **PAUSED** | `stake`, `unstake`, `claim_rewards`, `swap`, `add_liquidity`, `remove_liquidity`, `create_pool`, `flash_loan`, `fund_reward_vault` | `emergency_unstake`, `emergency_remove_liquidity`, `update_rewards`, `close_stake_account`, and all admin/governance instructions |
-| **ACTIVE** | `emergency_unstake`, `emergency_remove_liquidity` (they require paused state) | All operations |
+| **ACTIVE** | `emergency_unstake`, `emergency_remove_liquidity` (they require paused state)                                                      | All operations                                                                                                                    |
 
 **Rationale:** Pause is a circuit-breaker. While paused:
 
@@ -167,13 +167,13 @@ user_reward = user_stake × reward_per_token / PRECISION - reward_per_token_paid
 
 **Protections:**
 
-| Attack | Mitigation |
-|---|---|
-| **Reward inflation via time manipulation** | Time capped at 24h per `update_global_rewards` call |
-| **Reward extraction without stake** | `user_stake.staked_amount > 0` gate on rewards |
-| **Dust staking attacks** | `MIN_STAKE_AMOUNT = 1_000_000_000` (1 SOL / 1,000 USDC) |
-| **Precision loss** | `PRECISION = 10^18` scaling factor |
-| **Integer overflow** | `checked_add`/`checked_mul`/`checked_div` on all arithmetic |
+| Attack                                     | Mitigation                                                  |
+| ------------------------------------------ | ----------------------------------------------------------- |
+| **Reward inflation via time manipulation** | Time capped at 24h per `update_global_rewards` call         |
+| **Reward extraction without stake**        | `user_stake.staked_amount > 0` gate on rewards              |
+| **Dust staking attacks**                   | `MIN_STAKE_AMOUNT = 1_000_000_000` (1 SOL / 1,000 USDC)     |
+| **Precision loss**                         | `PRECISION = 10^18` scaling factor                          |
+| **Integer overflow**                       | `checked_add`/`checked_mul`/`checked_div` on all arithmetic |
 
 ### AMM Invariant Protection
 
@@ -185,14 +185,14 @@ assert(k_after >= k_last)
 
 **Protections:**
 
-| Attack | Mitigation |
-|---|---|
-| **Swap manipulation** | Post-swap invariant ≥ pre-swap k_last |
-| **Swap size exploitation** | Max 10% of reserve side per swap |
-| **Flash loan theft** | Post-loan invariant ≥ pre-loan + fee |
-| **LP dilution** | `MINIMUM_LIQUIDITY = 1,000` tokens locked forever |
-| **Proportionality abuse** | ±0.1% tolerance on liquidity additions |
-| **Pool key collision** | `token_a < token_b` enforced deterministically |
+| Attack                     | Mitigation                                        |
+| -------------------------- | ------------------------------------------------- |
+| **Swap manipulation**      | Post-swap invariant ≥ pre-swap k_last             |
+| **Swap size exploitation** | Max 10% of reserve side per swap                  |
+| **Flash loan theft**       | Post-loan invariant ≥ pre-loan + fee              |
+| **LP dilution**            | `MINIMUM_LIQUIDITY = 1,000` tokens locked forever |
+| **Proportionality abuse**  | ±0.1% tolerance on liquidity additions            |
+| **Pool key collision**     | `token_a < token_b` enforced deterministically    |
 
 ### Reward Decimal Normalisation
 
@@ -225,12 +225,12 @@ Post-loan invariant must cover fee
 
 **Flash-loan trust model:**
 
-| Party | Trusted? | Rationale |
-|---|---|---|
-| Governance signers (3-of-3 + timelock) | Trusted | Can update the allowlisted callback program |
-| The allowlisted callback program | **Partially trusted** — it executes arbitrary logic during the callback, but cannot keep protocol state inconsistent because the protocol re-checks the AMM invariant after the callback returns |
-| The borrower (signer) | Not trusted | Only chooses `amount` and the callback program id (which must equal the allowlist); cannot bypass repayment |
-| Token program / system program | Trusted (via Anchor CPI) | Standard SPL token semantics |
+| Party                                  | Trusted?                                                                                                                                                                                         | Rationale                                                                                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| Governance signers (3-of-3 + timelock) | Trusted                                                                                                                                                                                          | Can update the allowlisted callback program                                                                 |
+| The allowlisted callback program       | **Partially trusted** — it executes arbitrary logic during the callback, but cannot keep protocol state inconsistent because the protocol re-checks the AMM invariant after the callback returns |
+| The borrower (signer)                  | Not trusted                                                                                                                                                                                      | Only chooses `amount` and the callback program id (which must equal the allowlist); cannot bypass repayment |
+| Token program / system program         | Trusted (via Anchor CPI)                                                                                                                                                                         | Standard SPL token semantics                                                                                |
 
 **What the allowlisted callback program is permitted to do:**
 
@@ -262,6 +262,7 @@ amount + other
 ```
 
 **Custom error codes** for all arithmetic failures:
+
 - `6000`: Overflow
 - `6001`: Underflow
 
@@ -271,28 +272,28 @@ This means **no arithmetic panic can occur on-chain** — every operation either
 
 ## Frontend Security
 
-| Layer | Measure |
-|---|---|
-| **Wallet adapter** | Uses `@solana/wallet-adapter-react` — messages signed by wallet, not plaintext keys |
-| **Transaction building** | Auto-creates ATAs before CPI calls, preventing "account not found" errors |
-| **WSOL wrapping** | Auto-wraps native SOL before token operations, transparent to user |
-| **Error parsing** | Extracts on-chain error codes and logs, maps to plain-English messages |
-| **Simulation handling** | Gracefully handles `SendTransactionError` with `getLogs()` extraction |
-| **Blockhash expiry** | Friendly message for expired blockhashes (common on mobile wallets) |
-| **No key storage** | No private keys or mnemonics stored in frontend state |
+| Layer                    | Measure                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------- |
+| **Wallet adapter**       | Uses `@solana/wallet-adapter-react` — messages signed by wallet, not plaintext keys |
+| **Transaction building** | Auto-creates ATAs before CPI calls, preventing "account not found" errors           |
+| **WSOL wrapping**        | Auto-wraps native SOL before token operations, transparent to user                  |
+| **Error parsing**        | Extracts on-chain error codes and logs, maps to plain-English messages              |
+| **Simulation handling**  | Gracefully handles `SendTransactionError` with `getLogs()` extraction               |
+| **Blockhash expiry**     | Friendly message for expired blockhashes (common on mobile wallets)                 |
+| **No key storage**       | No private keys or mnemonics stored in frontend state                               |
 
 ---
 
 ## Known Limitations & Production Readiness
 
-| Area | Current State | Path to Production |
-|---|---|---|
-| **Formal audit** | Not conducted | Third-party audit (OtterSec, Neodyme, or similar) required |
-| **Economic modelling** | Not included | Fee calibration, liquidity stress tests, adversarial market simulations |
-| **Fuzz/property testing** | Not included | Add property tests for swap invariants, reward arithmetic, flash loan repayment |
-| **Bug bounty** | Not established | Launch on Immunefi or similar platform |
-| **Deployer key management** | Single authority key | Multi-sig deployer (Squads or similar) for program upgrades |
-| **Mainnet deployment** | Devnet only | Requires governance operations playbook, monitoring, alerting |
+| Area                        | Current State        | Path to Production                                                              |
+| --------------------------- | -------------------- | ------------------------------------------------------------------------------- |
+| **Formal audit**            | Not conducted        | Third-party audit (OtterSec, Neodyme, or similar) required                      |
+| **Economic modelling**      | Not included         | Fee calibration, liquidity stress tests, adversarial market simulations         |
+| **Fuzz/property testing**   | Not included         | Add property tests for swap invariants, reward arithmetic, flash loan repayment |
+| **Bug bounty**              | Not established      | Launch on Immunefi or similar platform                                          |
+| **Deployer key management** | Single authority key | Multi-sig deployer (Squads or similar) for program upgrades                     |
+| **Mainnet deployment**      | Devnet only          | Requires governance operations playbook, monitoring, alerting                   |
 
 ---
 

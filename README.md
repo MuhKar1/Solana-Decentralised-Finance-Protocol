@@ -94,16 +94,16 @@ The DeFi Protocol is a complete on-chain financial application built on Solana u
 
 All protocol accounts use **Program Derived Addresses (PDAs)** with deterministic seeds:
 
-| Account | Seeds |
-|---|---|
-| Program State | `["state"]` |
-| Staking Pool | `["staking_pool_sol"]` / `["staking_pool_usdc"]` |
-| Reward Vault | `["reward_vault_sol"]` / `["reward_vault_usdc"]` |
-| Protocol Treasury | `["protocol_treasury", mint]` |
-| User Stake | `["user_stake", user_pubkey, [token_type]]` |
-| Pool | `["pool", token_a_mint, token_b_mint]` |
-| Pool Token Vault | `["pool_token_a", pool]` / `["pool_token_b", pool]` |
-| LP Token Mint | `["lp_token_mint", pool]` |
+| Account           | Seeds                                               |
+| ----------------- | --------------------------------------------------- |
+| Program State     | `["state"]`                                         |
+| Staking Pool      | `["staking_pool_sol"]` / `["staking_pool_usdc"]`    |
+| Reward Vault      | `["reward_vault_sol"]` / `["reward_vault_usdc"]`    |
+| Protocol Treasury | `["protocol_treasury", mint]`                       |
+| User Stake        | `["user_stake", user_pubkey, [token_type]]`         |
+| Pool              | `["pool", token_a_mint, token_b_mint]`              |
+| Pool Token Vault  | `["pool_token_a", pool]` / `["pool_token_b", pool]` |
+| LP Token Mint     | `["lp_token_mint", pool]`                           |
 
 ---
 
@@ -113,20 +113,22 @@ All protocol accounts use **Program Derived Addresses (PDAs)** with deterministi
 
 The protocol uses a **3-of-3 multi-signature scheme** with timelock enforcement for all sensitive operations.
 
-| Operation | Requires | Timelock |
-|---|---|---|
-| Pause protocol | 3/3 signers, proposal + approvals | Yes |
-| Unpause protocol | 3/3 signers, proposal + approvals | Yes |
-| Update reward rate | 3/3 signers, proposal + approvals | Yes |
-| Update flash loan callback | 3/3 signers, proposal + approvals | Yes |
+| Operation                  | Requires                          | Timelock |
+| -------------------------- | --------------------------------- | -------- |
+| Pause protocol             | 3/3 signers, proposal + approvals | Yes      |
+| Unpause protocol           | 3/3 signers, proposal + approvals | Yes      |
+| Update reward rate         | 3/3 signers, proposal + approvals | Yes      |
+| Update flash loan callback | 3/3 signers, proposal + approvals | Yes      |
 
 **Proposal lifecycle:**
+
 1. **Propose** — Any of the 3 signers initiates a proposal with encoded action data. The proposal's creation timestamp (`proposed_at`) is recorded here.
 2. **Approve** — The remaining signers approve; each approval is tracked in a `[bool; 3]` bitmap.
 3. **Execute** — The action executes only when **both** conditions hold: (a) all 3 signers have approved, **and** (b) `now >= proposed_at + timelock_delay`. The timelock countdown starts at **proposal creation time**, not at the final approval. If the signers take longer than the delay to reach 3/3, the action becomes executable immediately upon the final approval; otherwise there is a residual wait until the delay elapses.
 4. **Cancel** — Any signer can cancel a pending proposal before execution.
 
 **Admin-only initialisation:**
+
 - `initialize_state` — Sets authority, 3 signer pubkeys, timelock delay, reward rate, protocol fee
 - `initialize_sol_accounts` — Creates SOL staking pool, reward vault, and treasury PDAs
 - `initialize_usdc_accounts` — Creates USDC staking pool, reward vault, and treasury PDAs
@@ -137,6 +139,7 @@ The protocol uses a **3-of-3 multi-signature scheme** with timelock enforcement 
 Dual-token staking with independent SOL and USDC pools. Each operates identically but with appropriate decimal handling (9 for SOL, 6 for USDC).
 
 **Reward calculation model:**
+
 - **Reward-per-token** global accumulator updated on each state change
 - Per-user **reward_per_token_paid** checkpoint prevents double-claiming
 - Time-capped accrual (max 24h per update) prevents exploitation
@@ -153,6 +156,7 @@ Dual-token staking with independent SOL and USDC pools. Each operates identicall
 | `update_rewards` | Manual reward recalculation | For UI synchronisation |
 
 **Token-type normalisation:**
+
 ```rust
 MIN_STAKE_AMOUNT = 1_000_000_000  // 1 SOL (9 decimals) or 1,000 USDC (6 decimals)
 ```
@@ -168,15 +172,16 @@ A constant-product market maker (x·y = k) between SOL and USDC.
 
 **Pool operations:**
 
-| Function | Description | Safety |
-|---|---|---|
-| `create_pool` | Admin creates pool PDA + vault accounts | Authority-gated, fee 1–1000 bps |
-| `add_liquidity` | Deposit SOL+USDC, receive LP tokens | Proportionality check, slippage guard |
-| `remove_liquidity` | Burn LP tokens, withdraw SOL+USDC | Slippage guard, invariant update |
-| `emergency_remove_liquidity` | Remove all LP when paused | Paused state only |
-| `swap` | SOL → USDC exchange | Fee deduction, slippage guard, invariant enforcement |
+| Function                     | Description                             | Safety                                               |
+| ---------------------------- | --------------------------------------- | ---------------------------------------------------- |
+| `create_pool`                | Admin creates pool PDA + vault accounts | Authority-gated, fee 1–1000 bps                      |
+| `add_liquidity`              | Deposit SOL+USDC, receive LP tokens     | Proportionality check, slippage guard                |
+| `remove_liquidity`           | Burn LP tokens, withdraw SOL+USDC       | Slippage guard, invariant update                     |
+| `emergency_remove_liquidity` | Remove all LP when paused               | Paused state only                                    |
+| `swap`                       | SOL → USDC exchange                     | Fee deduction, slippage guard, invariant enforcement |
 
 **Key AMM rules:**
+
 - Token pair ordering enforced (`token_a < token_b`) for deterministic PDA derivation
 - Initial liquidity provision mints `sqrt(x·y)` LP tokens total: `MINIMUM_LIQUIDITY` (1,000) are
   minted to a PDA-owned lock account that can never be withdrawn, and `sqrt(x·y) - MINIMUM_LIQUIDITY`
@@ -186,6 +191,7 @@ A constant-product market maker (x·y = k) between SOL and USDC.
 - Post-swap invariant must be ≥ pre-swap k_last value
 
 **Fees:**
+
 - **Swap fee:** Configurable at pool creation (default 30 bps = 0.3%)
 - **Flash loan fee:** Fixed at 30 bps (0.3%) — hardcoded in contract
 - Fees accrue to the pool, benefiting all LPs proportionally
@@ -195,6 +201,7 @@ A constant-product market maker (x·y = k) between SOL and USDC.
 Permissioned flash loans with a callback-program allowlist model.
 
 **Flow:**
+
 1. Borrower's authorised callback program must be approved via governance
 2. Borrower calls `flash_loan(amount, callback_program_id)`
 3. Protocol transfers tokens from pool vault → borrower's token account
@@ -203,6 +210,7 @@ Permissioned flash loans with a callback-program allowlist model.
 6. Protocol validates repayment: post-loan invariant ≥ pre-loan invariant + fee
 
 **Safety bounds:**
+
 - Maximum loan: 50% of the selected pool reserve
 - Callback deadline: 60 seconds from initiation
 - Only governor-approved programs may serve as callbacks
@@ -213,12 +221,12 @@ Permissioned flash loans with a callback-program allowlist model.
 Both `pause` and `unpause` require 3-of-3 signer approval **and** the timelock
 delay to elapse (measured from the proposal's `proposed_at` timestamp).
 
-| Mechanism | Trigger | Effect |
-|---|---|---|
-| `pause` | 3/3 governance approval + timelock | Stops `stake`, `unstake`, `claim_rewards`, `swap`, `add_liquidity`, `remove_liquidity`, `create_pool`, `flash_loan`, and `fund_reward_vault` |
-| `unpause` | 3/3 governance approval + timelock | Resumes normal operations |
-| `emergency_unstake` | Protocol paused | Users withdraw 100% of staked principal, forfeiting accrued `pending_rewards` |
-| `emergency_remove_liquidity` | Protocol paused | LPs withdraw a proportional share of pool reserves |
+| Mechanism                    | Trigger                            | Effect                                                                                                                                       |
+| ---------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pause`                      | 3/3 governance approval + timelock | Stops `stake`, `unstake`, `claim_rewards`, `swap`, `add_liquidity`, `remove_liquidity`, `create_pool`, `flash_loan`, and `fund_reward_vault` |
+| `unpause`                    | 3/3 governance approval + timelock | Resumes normal operations                                                                                                                    |
+| `emergency_unstake`          | Protocol paused                    | Users withdraw 100% of staked principal, forfeiting accrued `pending_rewards`                                                                |
+| `emergency_remove_liquidity` | Protocol paused                    | LPs withdraw a proportional share of pool reserves                                                                                           |
 
 ---
 
@@ -263,30 +271,30 @@ Layer 5: Frontend
 
 ### Custom Error Codes (30 total)
 
-| Range | Category |
-|---|---|
-| 6000–6002 | Arithmetic (Overflow, Underflow, Unauthorised) |
-| 6003–6004 | Admin state (Paused, NotInEmergencyMode) |
-| 6005–6007 | Amounts (InvalidAmount, InsufficientBalance, Slippage) |
-| 6008–6010 | AMM (NonProportionalLiquidity, InvariantViolation, InvalidMintOrder) |
-| 6011–6015 | Staking (NoRewards, StakeAccountNotEmpty, InsufficientLiquidity, InsufficientStakeAmount, BelowMinimum) |
-| 6016–6018 | Swap/Token (ExcessiveSwapAmount, InvalidFeeAmount, InvalidMint) |
+| Range     | Category                                                                                                        |
+| --------- | --------------------------------------------------------------------------------------------------------------- |
+| 6000–6002 | Arithmetic (Overflow, Underflow, Unauthorised)                                                                  |
+| 6003–6004 | Admin state (Paused, NotInEmergencyMode)                                                                        |
+| 6005–6007 | Amounts (InvalidAmount, InsufficientBalance, Slippage)                                                          |
+| 6008–6010 | AMM (NonProportionalLiquidity, InvariantViolation, InvalidMintOrder)                                            |
+| 6011–6015 | Staking (NoRewards, StakeAccountNotEmpty, InsufficientLiquidity, InsufficientStakeAmount, BelowMinimum)         |
+| 6016–6018 | Swap/Token (ExcessiveSwapAmount, InvalidFeeAmount, InvalidMint)                                                 |
 | 6019–6023 | Governance (InsufficientSignatures, InvalidAction, TimelockNotExpired, InvalidTokenType, ProposalAlreadyActive) |
-| 6024–6027 | Flash Loans (FlashLoanNotRepaid, FlashLoanTooLarge, InvalidCallbackProgram, UnapprovedCallbackProgram) |
-| 6028–6029 | Multisig signers (InvalidMultisigSigner, DuplicateSigner) |
+| 6024–6027 | Flash Loans (FlashLoanNotRepaid, FlashLoanTooLarge, InvalidCallbackProgram, UnapprovedCallbackProgram)          |
+| 6028–6029 | Multisig signers (InvalidMultisigSigner, DuplicateSigner)                                                       |
 
 ### What's Protected
 
-| Attack Vector | Mitigation |
-|---|---|
-| Unauthorised admin actions | `has_one = authority` + multisig approval bitmap |
-| Front-running governance | Timelock delay (set at initialization, bounded by `MAX_TIMELOCK_DELAY`) |
-| Flash loan manipulation | Max 50% reserve + invariant check + approved callbacks only |
-| Slippage exploitation | User-set minimum output amounts rejected on-chain |
-| Dust staking attacks | Minimum stake threshold (1 SOL / 1,000 USDC) |
-| Reward inflation | Time-capped accrual (24h max per update) |
-| Pool imbalance | Proportionality checks with 0.1% tolerance |
-| Infinite mint attacks | LP mint authority = pool PDA (no external key) |
+| Attack Vector              | Mitigation                                                              |
+| -------------------------- | ----------------------------------------------------------------------- |
+| Unauthorised admin actions | `has_one = authority` + multisig approval bitmap                        |
+| Front-running governance   | Timelock delay (set at initialization, bounded by `MAX_TIMELOCK_DELAY`) |
+| Flash loan manipulation    | Max 50% reserve + invariant check + approved callbacks only             |
+| Slippage exploitation      | User-set minimum output amounts rejected on-chain                       |
+| Dust staking attacks       | Minimum stake threshold (1 SOL / 1,000 USDC)                            |
+| Reward inflation           | Time-capped accrual (24h max per update)                                |
+| Pool imbalance             | Proportionality checks with 0.1% tolerance                              |
+| Infinite mint attacks      | LP mint authority = pool PDA (no external key)                          |
 
 ---
 
@@ -309,18 +317,18 @@ Wallet Connect → My Portfolio (auto-populates) → Choose Operation Tab
 
 ### UI Features
 
-| Feature | Description |
-|---|---|
-| **My Portfolio** | Real-time display of staked SOL/USDC, pending rewards, LP tokens, pool share % |
-| **Auto-wrap SOL** | All SOL operations auto-wrap to WSOL and create ATAs transparently |
-| **Auto-ATA creation** | Every transaction auto-creates required Associated Token Accounts |
-| **Slippage presets** | 0.5% / 1% / 3% quick-select with live min-output preview |
-| **Pool data from chain** | Swap fee, flash loan fee, liquidity, callback program — all read live |
-| **Protocol state dashboard** | 19 on-chain parameters displayed in real-time (admin) |
-| **Emergency UI** | Emergency unstake/remove buttons visible during pause state |
-| **Error parsing** | 30 custom error codes mapped to plain-English messages + on-chain log extraction |
-| **Advanced mode** | Flash loan section collapsed behind developer toggle |
-| **Idempotent initialisation** | USDC mint recovered from on-chain if localStorage is cleared |
+| Feature                       | Description                                                                      |
+| ----------------------------- | -------------------------------------------------------------------------------- |
+| **My Portfolio**              | Real-time display of staked SOL/USDC, pending rewards, LP tokens, pool share %   |
+| **Auto-wrap SOL**             | All SOL operations auto-wrap to WSOL and create ATAs transparently               |
+| **Auto-ATA creation**         | Every transaction auto-creates required Associated Token Accounts                |
+| **Slippage presets**          | 0.5% / 1% / 3% quick-select with live min-output preview                         |
+| **Pool data from chain**      | Swap fee, flash loan fee, liquidity, callback program — all read live            |
+| **Protocol state dashboard**  | 19 on-chain parameters displayed in real-time (admin)                            |
+| **Emergency UI**              | Emergency unstake/remove buttons visible during pause state                      |
+| **Error parsing**             | 30 custom error codes mapped to plain-English messages + on-chain log extraction |
+| **Advanced mode**             | Flash loan section collapsed behind developer toggle                             |
+| **Idempotent initialisation** | USDC mint recovered from on-chain if localStorage is cleared                     |
 
 ---
 
@@ -431,16 +439,16 @@ cd app && npx tsc --noEmit
 
 The TypeScript test suite validates:
 
-| Category | Tests |
-|---|---|
-| **State initialisation** | Authority, signers, timelock, account creation |
-| **SOL/USDC accounts** | PDA creation, vault setup, treasury initialisation |
-| **Reward vault funding** | SOL wrapping, USDC minting, transfer validation |
-| **Staking lifecycle** | Stake, unstake, reward accrual, claims |
-| **AMM operations** | Pool creation, liquidity add/remove, swaps |
-| **Governance** | Propose, approve, execute, cancel, timelock enforcement |
-| **Security rejections** | Unauthorised access, below-minimum stakes, malformed swaps |
-| **Emergency paths** | Pause/unpause, emergency unstake/withdraw |
+| Category                 | Tests                                                      |
+| ------------------------ | ---------------------------------------------------------- |
+| **State initialisation** | Authority, signers, timelock, account creation             |
+| **SOL/USDC accounts**    | PDA creation, vault setup, treasury initialisation         |
+| **Reward vault funding** | SOL wrapping, USDC minting, transfer validation            |
+| **Staking lifecycle**    | Stake, unstake, reward accrual, claims                     |
+| **AMM operations**       | Pool creation, liquidity add/remove, swaps                 |
+| **Governance**           | Propose, approve, execute, cancel, timelock enforcement    |
+| **Security rejections**  | Unauthorised access, below-minimum stakes, malformed swaps |
+| **Emergency paths**      | Pause/unpause, emergency unstake/withdraw                  |
 
 ### Frontend (TypeScript)
 
@@ -458,11 +466,13 @@ anchor deploy --provider.cluster devnet
 ```
 
 Update the program ID in:
+
 - `programs/de-fi/src/lib.rs` (`declare_id!`)
 - `Anchor.toml` (`[programs.devnet]`)
 - `app/src/providers/solana-provider.tsx` (`PROGRAM_ID`)
 
 Rebuild the IDL after deployment:
+
 ```bash
 anchor build
 cp target/idl/defi.json app/src/idl/defi.json

@@ -1,0 +1,13 @@
+[package]
+name = "mock-flash-callback"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mock_flash_callback"
+
+[dependencies]
+solana-program = "2.3.0"

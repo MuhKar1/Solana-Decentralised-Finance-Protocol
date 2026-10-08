@@ -62,4 +62,10 @@ pub enum ErrorCode {
     InvalidMultisigSigner,
     #[msg("Duplicate multisig signer detected; all signers must be unique")]
     DuplicateSigner,
+    #[msg("Invalid Oracle Data")]
+    InvalidOracleData,
+    #[msg("Stale Oracle Price")]
+    StaleOraclePrice,
+    #[msg("Price Deviation Too High")]
+    PriceDeviationTooHigh,
 }

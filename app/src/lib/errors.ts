@@ -1,5 +1,6 @@
 const FRIENDLY_ERRORS: Record<number, string> = {
-  0xbc4: "Account not initialized. The program state hasn't been set up yet. An admin must call initialize_state first.",
+  0xbc4:
+    "Account not initialized. The program state hasn't been set up yet. An admin must call initialize_state first.",
   6000: "Math overflow.",
   6001: "Math underflow.",
   6002: "Unauthorized. Your wallet is not authorized for this action.",
@@ -75,7 +76,8 @@ export function parseErrorMessage(err: unknown): string {
 
   if (e.message && typeof e.message === "string") {
     const msg = e.message as string;
-    if (msg.includes("User rejected")) return "Cancelled — you declined in your wallet.";
+    if (msg.includes("User rejected"))
+      return "Cancelled — you declined in your wallet.";
     if (msg.includes("Blockhash not found"))
       return "Network delay — blockhash expired before signing. The network is busy or the wallet took too long. Please try again.";
     if (msg.includes("block height exceeded"))
